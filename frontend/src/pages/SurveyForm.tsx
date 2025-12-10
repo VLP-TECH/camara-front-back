@@ -8,10 +8,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Send } from "lucide-react";
+import { 
+  LayoutDashboard,
+  Layers,
+  LineChart,
+  Map,
+  BookOpen,
+  Clock,
+  FileText,
+  MessageSquare,
+  ArrowLeft,
+  Send,
+  Loader2
+} from "lucide-react";
 import { toast } from "sonner";
-import NavigationHeader from "@/components/NavigationHeader";
-import FooterSection from "@/components/FooterSection";
 
 interface Survey {
   id: string;
@@ -111,16 +121,73 @@ const SurveyForm = () => {
     }
   };
 
+  const menuItems = [
+    { icon: LayoutDashboard, label: "Dashboard General", href: "/dashboard" },
+    { icon: Layers, label: "Dimensiones", href: "/dimensiones" },
+    { icon: LineChart, label: "Todos los Indicadores", href: "/kpis" },
+    { icon: Map, label: "Comparación Territorial", href: "/comparacion" },
+    { icon: Clock, label: "Evolución Temporal", href: "/evolucion" },
+    { icon: FileText, label: "Informes", href: "/informes" },
+    { icon: MessageSquare, label: "Encuestas", href: "/encuestas", active: true },
+    { icon: BookOpen, label: "Metodología", href: "/metodologia" },
+  ];
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <NavigationHeader />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Cargando encuesta...</p>
+      <div className="min-h-screen bg-gray-100 flex">
+        {/* Sidebar */}
+        <aside className="w-64 bg-[#0c6c8b] text-white flex flex-col">
+          <div className="p-6">
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-[#0c6c8b] rounded"></div>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold">BRAINNOVA</h1>
+                <p className="text-xs text-blue-200">Economía Digital</p>
+              </div>
+            </div>
+            
+            <nav className="space-y-2">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.active;
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => item.href && navigate(item.href)}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                      isActive
+                        ? "bg-blue-600 text-white"
+                        : "text-blue-100 hover:bg-blue-700/50"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
           </div>
-        </main>
+          
+          <div className="mt-auto p-6 border-t border-blue-600">
+            <p className="text-xs text-blue-200">Versión 2025</p>
+            <p className="text-xs text-blue-200">Actualizado Nov 2025</p>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col">
+          <header className="bg-blue-100 text-[#0c6c8b] px-6 py-4">
+            <h2 className="text-lg font-semibold">BRAINNOVA Economía Digital</h2>
+          </header>
+          <main className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-[#0c6c8b] mx-auto mb-4" />
+              <p className="text-gray-600">Cargando encuesta...</p>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -130,115 +197,172 @@ const SurveyForm = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <NavigationHeader />
-
-      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/encuestas")}
-          className="mb-6"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver a encuestas
-        </Button>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl">{survey.title}</CardTitle>
-            {survey.description && (
-              <CardDescription className="text-base">
-                {survey.description}
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {questions.map((question, index) => (
-                <div key={question.id} className="space-y-4">
-                  <Label className="text-base font-semibold">
-                    {index + 1}. {question.question_text}
-                    {question.required && (
-                      <span className="text-destructive ml-1">*</span>
-                    )}
-                  </Label>
-
-                  {question.question_type === "text" && (
-                    <Input
-                      value={answers[question.id] || ""}
-                      onChange={(e) =>
-                        setAnswers({ ...answers, [question.id]: e.target.value })
-                      }
-                      required={question.required}
-                      placeholder="Tu respuesta"
-                    />
-                  )}
-
-                  {question.question_type === "textarea" && (
-                    <Textarea
-                      value={answers[question.id] || ""}
-                      onChange={(e) =>
-                        setAnswers({ ...answers, [question.id]: e.target.value })
-                      }
-                      required={question.required}
-                      placeholder="Tu respuesta"
-                      rows={4}
-                    />
-                  )}
-
-                  {question.question_type === "multiple_choice" &&
-                    question.options?.options && (
-                      <RadioGroup
-                        value={answers[question.id] || ""}
-                        onValueChange={(value) =>
-                          setAnswers({ ...answers, [question.id]: value })
-                        }
-                        required={question.required}
-                      >
-                        {question.options.options.map(
-                          (option: string, optIndex: number) => (
-                            <div
-                              key={optIndex}
-                              className="flex items-center space-x-2"
-                            >
-                              <RadioGroupItem
-                                value={option}
-                                id={`${question.id}-${optIndex}`}
-                              />
-                              <Label
-                                htmlFor={`${question.id}-${optIndex}`}
-                                className="font-normal cursor-pointer"
-                              >
-                                {option}
-                              </Label>
-                            </div>
-                          )
-                        )}
-                      </RadioGroup>
-                    )}
-                </div>
-              ))}
-
-              <div className="flex gap-4 pt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/encuestas")}
-                  className="flex-1"
+    <div className="min-h-screen bg-gray-100 flex">
+      {/* Sidebar */}
+      <aside className="w-64 bg-[#0c6c8b] text-white flex flex-col">
+        <div className="p-6">
+          <div className="flex items-center space-x-3 mb-8">
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-[#0c6c8b] rounded"></div>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold">BRAINNOVA</h1>
+              <p className="text-xs text-blue-200">Economía Digital</p>
+            </div>
+          </div>
+          
+          <nav className="space-y-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = item.active;
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => item.href && navigate(item.href)}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors relative ${
+                    isActive
+                      ? "bg-[#0a5a73] text-white"
+                      : "text-blue-100 hover:bg-[#0a5a73]/50"
+                  }`}
+                  style={isActive ? {
+                    borderLeft: '4px solid #4FD1C7'
+                  } : {}}
                 >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={submitting} className="flex-1">
-                  <Send className="mr-2 h-4 w-4" />
-                  {submitting ? "Enviando..." : "Enviar respuestas"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </main>
+                  <Icon className="h-5 w-5" />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+        
+        <div className="mt-auto p-6 border-t border-blue-600">
+          <p className="text-xs text-blue-200">Versión 2025</p>
+          <p className="text-xs text-blue-200">Actualizado Nov 2025</p>
+        </div>
+      </aside>
 
-      <FooterSection />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header */}
+        <header className="bg-blue-100 text-[#0c6c8b] px-6 py-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">BRAINNOVA Economía Digital</h2>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="flex-1 p-8 overflow-y-auto bg-gray-50">
+          <div className="max-w-4xl mx-auto">
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/encuestas")}
+              className="mb-6"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver a encuestas
+            </Button>
+
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle className="text-3xl text-[#0c6c8b]">{survey.title}</CardTitle>
+                {survey.description && (
+                  <CardDescription className="text-base text-gray-600">
+                    {survey.description}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-8">
+                  {questions.map((question, index) => (
+                    <div key={question.id} className="space-y-4">
+                      <Label className="text-base font-semibold text-gray-900">
+                        {index + 1}. {question.question_text}
+                        {question.required && (
+                          <span className="text-red-600 ml-1">*</span>
+                        )}
+                      </Label>
+
+                      {question.question_type === "text" && (
+                        <Input
+                          value={answers[question.id] || ""}
+                          onChange={(e) =>
+                            setAnswers({ ...answers, [question.id]: e.target.value })
+                          }
+                          required={question.required}
+                          placeholder="Tu respuesta"
+                        />
+                      )}
+
+                      {question.question_type === "textarea" && (
+                        <Textarea
+                          value={answers[question.id] || ""}
+                          onChange={(e) =>
+                            setAnswers({ ...answers, [question.id]: e.target.value })
+                          }
+                          required={question.required}
+                          placeholder="Tu respuesta"
+                          rows={4}
+                        />
+                      )}
+
+                      {question.question_type === "multiple_choice" &&
+                        question.options?.options && (
+                          <RadioGroup
+                            value={answers[question.id] || ""}
+                            onValueChange={(value) =>
+                              setAnswers({ ...answers, [question.id]: value })
+                            }
+                            required={question.required}
+                          >
+                            {question.options.options.map(
+                              (option: string, optIndex: number) => (
+                                <div
+                                  key={optIndex}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <RadioGroupItem
+                                    value={option}
+                                    id={`${question.id}-${optIndex}`}
+                                  />
+                                  <Label
+                                    htmlFor={`${question.id}-${optIndex}`}
+                                    className="font-normal cursor-pointer"
+                                  >
+                                    {option}
+                                  </Label>
+                                </div>
+                              )
+                            )}
+                          </RadioGroup>
+                        )}
+                    </div>
+                  ))}
+
+                  <div className="flex gap-4 pt-6">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate("/encuestas")}
+                      className="flex-1"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={submitting} 
+                      className="flex-1 bg-[#0c6c8b] text-white hover:bg-[#0a5a73]"
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      {submitting ? "Enviando..." : "Enviar respuestas"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

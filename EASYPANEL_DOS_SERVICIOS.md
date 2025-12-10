@@ -253,3 +253,4 @@ Después de configurar ambos servicios:
 Ahora tienes dos servicios Docker separados ejecutándose en Easypanel, conectados entre sí. El frontend puede comunicarse con el backend usando el nombre del servicio como hostname.
 
 
+

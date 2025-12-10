@@ -77,3 +77,4 @@ docker build -t camara-vlc-frontend .
 docker run -d -p 4173:4173 --env-file .env camara-vlc-frontend
 ```
 
+

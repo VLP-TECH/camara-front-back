@@ -62,3 +62,4 @@ Las migraciones se encuentran en `supabase/migrations/`. Para aplicarlas:
 - Algunos scripts hacen referencia a rutas absolutas que pueden necesitar actualización
 - Los scripts SQL deben ejecutarse en el orden correcto según las dependencias
 
+

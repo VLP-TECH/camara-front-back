@@ -1,713 +1,410 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import NavigationHeader from "@/components/NavigationHeader";
-import FooterSection from "@/components/FooterSection";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { 
-  TrendingUp, 
-  Lightbulb, 
-  GraduationCap, 
-  Users, 
-  Wifi, 
-  Building2, 
-  Leaf, 
-  Briefcase,
-  Download,
-  ArrowUpRight,
-  Loader2,
-  Database
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer,
+  LayoutDashboard,
+  Layers,
   LineChart,
+  Map,
+  BookOpen,
+  Clock,
+  FileText,
+  Search,
+  Download,
+  TrendingUp,
+  ArrowRight,
+  Loader2,
+  MessageSquare
+} from "lucide-react";
+import {
+  LineChart as RechartsLineChart,
   Line,
-  AreaChart,
-  Area,
+  ResponsiveContainer,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  RadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis
+  Tooltip
 } from "recharts";
 import {
   getDimensiones,
   getIndicadoresConDatos,
   getDatosHistoricosIndicador,
-  getDatosPorSubdimension,
   type IndicadorConDatos,
 } from "@/lib/kpis-data";
-import {
-  exportIndicadoresToCSV,
-  exportChartDataToCSV,
-  exportHistoricDataToCSV,
-} from "@/lib/csv-export";
-
-// Mapeo de nombres de dimensiones a iconos y colores
-const dimensionIcons: Record<string, any> = {
-  "emprendimiento e innovación": Lightbulb,
-  "capital humano": GraduationCap,
-  "ecosistema y colaboración": Users,
-  "infraestructura digital": Wifi,
-  "servicios públicos digitales": Building2,
-  "sostenibilidad digital": Leaf,
-  "transformación digital empresarial": Briefcase,
-};
-
-const dimensionColors: Record<string, { color: string; bgColor: string }> = {
-  "emprendimiento e innovación": { color: "text-primary", bgColor: "bg-primary/10" },
-  "capital humano": { color: "text-accent", bgColor: "bg-accent/10" },
-  "ecosistema y colaboración": { color: "text-secondary", bgColor: "bg-secondary/10" },
-  "infraestructura digital": { color: "text-success", bgColor: "bg-success/10" },
-  "servicios públicos digitales": { color: "text-primary", bgColor: "bg-primary/10" },
-  "sostenibilidad digital": { color: "text-accent", bgColor: "bg-accent/10" },
-  "transformación digital empresarial": { color: "text-secondary", bgColor: "bg-secondary/10" },
-};
+import { exportIndicadoresToCSV } from "@/lib/csv-export";
 
 const KPIsDashboard = () => {
-  const [selectedDimension, setSelectedDimension] = useState<string>("");
-  const [selectedPais] = useState("España");
+  const navigate = useNavigate();
+  const [selectedTerritorio, setSelectedTerritorio] = useState("Comunitat Valenciana");
+  const [selectedAno, setSelectedAno] = useState("2024");
+  const [selectedReferencia, setSelectedReferencia] = useState("Media UE");
+  const [selectedView, setSelectedView] = useState("Tabla");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDimension, setSelectedDimension] = useState("Todas las dimensiones");
+  const [selectedSubdimension, setSelectedSubdimension] = useState("Todas las subdimensiones");
 
-  // Obtener dimensiones desde Supabase
-  const { data: dimensiones, isLoading: loadingDimensiones } = useQuery({
+  // Obtener dimensiones
+  const { data: dimensiones } = useQuery({
     queryKey: ["dimensiones"],
     queryFn: getDimensiones,
   });
 
-  // Obtener indicadores de la dimensión seleccionada
-  const { data: indicadores, isLoading: loadingIndicadores } = useQuery({
-    queryKey: ["indicadores-dimension", selectedDimension],
-    queryFn: () => getIndicadoresConDatos(selectedDimension || undefined),
-    enabled: !!selectedDimension,
+  // Obtener todos los indicadores
+  const { data: indicadores, isLoading } = useQuery({
+    queryKey: ["todos-indicadores"],
+    queryFn: () => getIndicadoresConDatos(),
   });
 
-  // Obtener datos por subdimensión para gráficos
-  const { data: datosSubdimensiones } = useQuery({
-    queryKey: ["datos-subdimensiones", selectedDimension, selectedPais],
-    queryFn: () => getDatosPorSubdimension(selectedDimension, selectedPais),
-    enabled: !!selectedDimension,
+  // Filtrar indicadores
+  const filteredIndicadores = indicadores?.filter((ind) => {
+    const matchesSearch = !searchQuery || 
+      ind.nombre.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDimension = selectedDimension === "Todas las dimensiones" || 
+      ind.dimension === selectedDimension;
+    const matchesSubdimension = selectedSubdimension === "Todas las subdimensiones" || 
+      ind.subdimension === selectedSubdimension;
+    
+    return matchesSearch && matchesDimension && matchesSubdimension;
+  }) || [];
+
+  // Obtener datos históricos para gráficos de evolución
+  const { data: historicoData } = useQuery({
+    queryKey: ["historico-indicadores", filteredIndicadores?.map(i => i.nombre)],
+    queryFn: async () => {
+      if (!filteredIndicadores || filteredIndicadores.length === 0) return {};
+      const historicos: Record<string, any[]> = {};
+      for (const ind of filteredIndicadores.slice(0, 10)) {
+        const data = await getDatosHistoricosIndicador(ind.nombre, selectedTerritorio, 5);
+        if (data && data.length > 0) {
+          historicos[ind.nombre] = data.map(d => ({
+            periodo: d.periodo,
+            valor: d.valor_calculado
+          }));
+        }
+      }
+      return historicos;
+    },
+    enabled: filteredIndicadores && filteredIndicadores.length > 0,
   });
 
-  // Establecer primera dimensión como seleccionada por defecto
-  useEffect(() => {
-    if (dimensiones && dimensiones.length > 0 && !selectedDimension) {
-      setSelectedDimension(dimensiones[0].nombre);
+  const handleExport = () => {
+    if (filteredIndicadores) {
+      exportIndicadoresToCSV(filteredIndicadores, "todos-indicadores");
     }
-  }, [dimensiones, selectedDimension]);
-
-  const getKPIsByDimension = (dimensionNombre: string): IndicadorConDatos[] => {
-    if (!indicadores) return [];
-    return indicadores.filter((ind) => ind.dimension === dimensionNombre);
   };
 
-  const getPieChartData = (dimensionKPIs: IndicadorConDatos[]) => {
-    const subdimensionCount = dimensionKPIs.reduce((acc, kpi) => {
-      const subdim = kpi.subdimension || 'Otros';
-      acc[subdim] = (acc[subdim] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return Object.entries(subdimensionCount)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5); // Top 5 subdimensiones
+  // Calcular valor normalizado (0-100)
+  const getNormalizedValue = (valor: number | undefined): number => {
+    if (!valor) return 0;
+    // Normalización simple (ajustar según lógica de negocio)
+    return Math.min(100, Math.max(0, (valor / 100) * 100));
   };
 
-  // Obtener datos históricos para el gráfico de líneas
-  const indicadorParaGrafico = indicadores?.find(
-    (ind) => ind.totalResultados && ind.totalResultados > 0
-  ) || indicadores?.[0];
-
-  const { data: datosHistoricos } = useQuery({
-    queryKey: ["datos-historicos", indicadorParaGrafico?.nombre, selectedPais],
-    queryFn: () =>
-      indicadorParaGrafico
-        ? getDatosHistoricosIndicador(indicadorParaGrafico.nombre, selectedPais, 10)
-        : Promise.resolve([]),
-    enabled: !!indicadorParaGrafico && !!selectedDimension,
-  });
-
-  const getLineChartData = () => {
-    if (!datosHistoricos || datosHistoricos.length === 0) {
-      return [];
-    }
-
-    return datosHistoricos.map((item) => ({
-      name: item.periodo.toString(),
-      valor: item.valor,
-    }));
-  };
-
-  const getRadarChartData = (dimensionKPIs: IndicadorConDatos[]) => {
-    // Usar datos reales de subdimensiones
-    if (datosSubdimensiones && datosSubdimensiones.length > 0) {
-      return datosSubdimensiones
-        .map((item) => {
-          const porcentajeConDatos = item.totalIndicadores > 0
-            ? Math.round((item.indicadoresConDatos / item.totalIndicadores) * 100)
-            : 0;
-          const porcentajeSinDatos = item.totalIndicadores > 0
-            ? Math.round(((item.totalIndicadores - item.indicadoresConDatos) / item.totalIndicadores) * 100)
-            : 0;
-          
-          return {
-            subdimension:
-              item.subdimension.length > 30
-                ? item.subdimension.substring(0, 30) + "..."
-                : item.subdimension,
-            "Cobertura": porcentajeConDatos,
-            "Sin datos": porcentajeSinDatos,
-            "Total indicadores": item.totalIndicadores,
-          };
-        })
-        .filter((item) => item["Total indicadores"] > 0) // Solo mostrar subdimensiones con indicadores
-        .slice(0, 10); // Mostrar hasta 10 subdimensiones
-    }
-
-    // Fallback: agrupar por subdimensión
-    const subdimensionData = dimensionKPIs.reduce((acc, kpi) => {
-      const subdim = kpi.subdimension || "Otros";
-      if (!acc[subdim]) {
-        acc[subdim] = {
-          name: subdim,
-          total: 0,
-          conDatos: 0,
-          altaImportancia: 0,
-        };
-      }
-      acc[subdim].total += 1;
-      if (kpi.totalResultados && kpi.totalResultados > 0) {
-        acc[subdim].conDatos += 1;
-      }
-      const importance = kpi.importancia?.toLowerCase() || "";
-      if (importance.includes("alta")) {
-        acc[subdim].altaImportancia += 1;
-      }
-      return acc;
-    }, {} as Record<string, any>);
-
-    return Object.values(subdimensionData)
-      .map((item: any) => {
-        const porcentajeConDatos = item.total > 0
-          ? Math.round((item.conDatos / item.total) * 100)
-          : 0;
-        const porcentajeSinDatos = item.total > 0
-          ? Math.round(((item.total - item.conDatos) / item.total) * 100)
-          : 0;
-        
-        return {
-          subdimension:
-            item.name.length > 30 ? item.name.substring(0, 30) + "..." : item.name,
-          "Cobertura": porcentajeConDatos,
-          "Sin datos": porcentajeSinDatos,
-          "Total indicadores": item.total,
-        };
-      })
-      .filter((item: any) => item["Total indicadores"] > 0)
-      .slice(0, 10);
-  };
-
-  const COLORS = [
-    "hsl(var(--primary))",
-    "hsl(var(--accent))",
-    "hsl(var(--secondary))",
-    "hsl(var(--success))",
-    "hsl(var(--warning))",
+  const menuItems = [
+    { icon: LayoutDashboard, label: "Dashboard General", href: "/dashboard" },
+    { icon: Layers, label: "Dimensiones", href: "/dimensiones" },
+    { icon: LineChart, label: "Todos los Indicadores", href: "/kpis", active: true },
+    { icon: Map, label: "Comparación Territorial", href: "/comparacion" },
+    { icon: Clock, label: "Evolución Temporal", href: "/evolucion" },
+    { icon: FileText, label: "Informes", href: "/informes" },
+    { icon: MessageSquare, label: "Encuestas", href: "/encuestas" },
+    { icon: BookOpen, label: "Metodología", href: "/metodologia" },
   ];
 
-  const loading = loadingDimensiones || loadingIndicadores;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <NavigationHeader />
-        <div className="pt-16 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Cargando KPIs desde la base de datos...</p>
-          </div>
-        </div>
-        <FooterSection />
-      </div>
-    );
-  }
-
-  if (!dimensiones || dimensiones.length === 0) {
-    return (
-      <div className="min-h-screen bg-background">
-        <NavigationHeader />
-        <div className="pt-16 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <Database className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No hay dimensiones disponibles</p>
-          </div>
-        </div>
-        <FooterSection />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      <NavigationHeader />
-      
-      <main className="pt-24 pb-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-12 text-center">
-            <h1 className="text-4xl font-bold text-foreground mb-4 flex items-center justify-center gap-2">
-              <TrendingUp className="h-8 w-8 text-primary" />
-              Dashboard completo de KPIs
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Sistema de indicadores del ecosistema digital valenciano organizados por dimensiones
-            </p>
+    <div className="min-h-screen bg-gray-100 flex">
+      {/* Sidebar */}
+      <aside className="w-64 bg-[#0c6c8b] text-white flex flex-col">
+        <div className="p-6">
+          <div className="flex items-center space-x-3 mb-8">
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-[#0c6c8b] rounded"></div>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold">BRAINNOVA</h1>
+              <p className="text-xs text-blue-200">Economía Digital</p>
+            </div>
           </div>
-
-          {/* Tabs por dimensión */}
-          <Tabs value={selectedDimension} onValueChange={setSelectedDimension} className="w-full">
-            <TabsList className="w-full justify-start flex-wrap h-auto mb-8 bg-muted/50 p-2">
-              {dimensiones.map((dimension) => {
-                const Icon = dimensionIcons[dimension.nombre.toLowerCase()] || Database;
-                const colors = dimensionColors[dimension.nombre.toLowerCase()] || {
-                  color: "text-primary",
-                  bgColor: "bg-primary/10",
-                };
-                return (
-                  <TabsTrigger
-                    key={dimension.id}
-                    value={dimension.nombre}
-                    className="text-sm px-4 py-2 flex items-center gap-2"
-                  >
-                    <Icon className="h-4 w-4" />
-                    {dimension.nombre}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-
-            {dimensiones.map((dimension) => {
-              const dimensionKPIs = getKPIsByDimension(dimension.nombre);
-              const topKPIs = dimensionKPIs.slice(0, 4);
-              const Icon = dimensionIcons[dimension.nombre.toLowerCase()] || Database;
-              const colors = dimensionColors[dimension.nombre.toLowerCase()] || {
-                color: "text-primary",
-                bgColor: "bg-primary/10",
-              };
-              
+          
+          <nav className="space-y-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = item.active;
               return (
-                <TabsContent key={dimension.id} value={dimension.nombre} className="space-y-8">
-                  {/* Header con estadísticas */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="p-6 bg-gradient-card border-0">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className={`p-3 rounded-lg ${colors.bgColor}`}>
-                          <Icon className={`h-6 w-6 ${colors.color}`} />
-                        </div>
-                      </div>
-                      <h3 className="text-3xl font-bold text-foreground mb-1">
-                        {dimensionKPIs.length}
-                      </h3>
-                      <p className="text-muted-foreground text-sm">Total indicadores</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Peso: {dimension.peso}%
-                      </p>
-                    </Card>
-
-                    {topKPIs.slice(0, 3).map((kpi, idx) => (
-                      <Card key={idx} className="p-6 bg-gradient-card border-0 hover:shadow-medium transition-all">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className={`p-3 rounded-lg ${colors.bgColor}`}>
-                            <TrendingUp className={`h-6 w-6 ${colors.color}`} />
-                          </div>
-                          {kpi.totalResultados && kpi.totalResultados > 0 && (
-                            <div className="flex items-center space-x-1 text-success">
-                              <ArrowUpRight className="h-4 w-4" />
-                              <span className="text-sm font-medium">
-                                {kpi.totalResultados} datos
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <h3 className="text-lg font-bold text-foreground mb-1 line-clamp-2">
-                          {kpi.nombre}
-                        </h3>
-                        <p className="text-muted-foreground text-sm">{kpi.subdimension || dimension.nombre}</p>
-                        {kpi.ultimoValor !== undefined && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Último valor ({kpi.ultimoPeriodo}): {kpi.ultimoValor.toFixed(2)}
-                          </p>
-                        )}
-                      </Card>
-                    ))}
-                  </div>
-
-                  {/* Gráficos variados */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Gráfico de tarta - Distribución por tipo */}
-                    <Card className="p-8 bg-gradient-card border-0 lg:col-span-2">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-semibold text-foreground flex items-center">
-                          <Icon className={`h-5 w-5 mr-2 ${colors.color}`} />
-                          Distribución por subdimensión
-                        </h3>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            const pieData = getPieChartData(dimensionKPIs);
-                            exportChartDataToCSV(pieData, "distribucion_subdimensiones", dimension.nombre);
-                          }}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Exportar CSV
-                        </Button>
-                      </div>
-                      {getPieChartData(dimensionKPIs).length > 0 ? (
-                        <ResponsiveContainer width="100%" height={400}>
-                          <PieChart>
-                            <Pie
-                              data={getPieChartData(dimensionKPIs)}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {getPieChartData(dimensionKPIs).map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: 'hsl(var(--card))', 
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px'
-                              }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex items-center justify-center h-[400px]">
-                          <p className="text-muted-foreground">No hay datos para mostrar</p>
-                        </div>
-                      )}
-                    </Card>
-
-                    {/* Gráfico de líneas - Evolución */}
-                    <Card className="p-6 bg-gradient-card border-0">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-semibold text-foreground flex items-center">
-                          <TrendingUp className={`h-5 w-5 mr-2 ${colors.color}`} />
-                          Evolución histórica
-                        </h3>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            if (datosHistoricos && indicadorParaGrafico) {
-                              exportHistoricDataToCSV(datosHistoricos, indicadorParaGrafico.nombre);
-                            }
-                          }}
-                          disabled={!datosHistoricos || datosHistoricos.length === 0}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Exportar CSV
-                        </Button>
-                      </div>
-                      {getLineChartData().length > 0 ? (
-                        <ResponsiveContainer width="100%" height={250}>
-                          <AreaChart data={getLineChartData()}>
-                            <defs>
-                              <linearGradient id={`color-${dimension.id}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                            <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
-                            <YAxis stroke="hsl(var(--muted-foreground))" />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: 'hsl(var(--card))', 
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px'
-                              }}
-                            />
-                            <Area 
-                              type="monotone" 
-                              dataKey="valor" 
-                              stroke="hsl(var(--primary))" 
-                              fillOpacity={1} 
-                              fill={`url(#color-${dimension.id})`}
-                              name={indicadorParaGrafico?.nombre || "Valor"}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex items-center justify-center h-[250px]">
-                          <p className="text-muted-foreground text-sm">
-                            {indicadorParaGrafico 
-                              ? "No hay datos históricos disponibles"
-                              : "Selecciona un indicador con datos"}
-                          </p>
-                        </div>
-                      )}
-                    </Card>
-                  </div>
-
-                  {/* Gráfico de radar */}
-                  <Card className="p-6 bg-gradient-card border-0">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-semibold text-foreground flex items-center">
-                          <Icon className={`h-5 w-5 mr-2 ${colors.color}`} />
-                        Análisis por subdimensión
-                      </h3>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          const radarData = getRadarChartData(dimensionKPIs);
-                          exportChartDataToCSV(radarData, "analisis_subdimensiones", dimension.nombre);
-                        }}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Exportar CSV
-                      </Button>
-                    </div>
-                    {getRadarChartData(dimensionKPIs).length > 0 ? (
-                      <ResponsiveContainer width="100%" height={450}>
-                        <RadarChart data={getRadarChartData(dimensionKPIs)}>
-                        <PolarGrid stroke="hsl(var(--muted))" />
-                        <PolarAngleAxis 
-                          dataKey="subdimension" 
-                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                          style={{ textTransform: 'capitalize' }}
-                        />
-                        <PolarRadiusAxis 
-                          angle={90} 
-                          domain={[0, 100]}
-                          tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                          tickFormatter={(value) => `${value}%`}
-                        />
-                        <Radar
-                          name="Cobertura de datos"
-                          dataKey="Cobertura"
-                          stroke="hsl(var(--success))"
-                          fill="hsl(var(--success))"
-                          fillOpacity={0.6}
-                          strokeWidth={2}
-                        />
-                        <Radar
-                          name="Sin datos"
-                          dataKey="Sin datos"
-                          stroke="hsl(var(--destructive))"
-                          fill="hsl(var(--destructive))"
-                          fillOpacity={0.3}
-                          strokeWidth={2}
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                            padding: '8px 12px'
-                          }}
-                          formatter={(value: any, name: string, props: any) => {
-                            if (name === "Cobertura de datos" || name === "Sin datos") {
-                              return [`${value}%`, name];
-                            }
-                            if (name === "Total indicadores") {
-                              return [`${value} indicadores`, name];
-                            }
-                            return [value, name];
-                          }}
-                        />
-                        <Legend 
-                          wrapperStyle={{ paddingTop: '20px' }}
-                          iconType="circle"
-                          formatter={(value) => {
-                            if (value === "Cobertura de datos") return "Cobertura";
-                            return value;
-                          }}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-[450px]">
-                        <p className="text-muted-foreground">No hay datos para mostrar</p>
-                      </div>
-                    )}
-                  </Card>
-
-                  {/* Lista con barras de progreso - Solo algunos indicadores */}
-                  <Card className="p-6 bg-gradient-card border-0">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-semibold text-foreground flex items-center">
-                        <Icon className={`h-5 w-5 mr-2 ${colors.color}`} />
-                        Indicadores destacados
-                      </h3>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          exportIndicadoresToCSV(dimensionKPIs, dimension.nombre);
-                        }}
-                        disabled={dimensionKPIs.length === 0}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Exportar todos
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {dimensionKPIs.slice(0, 6).map((kpi, idx) => {
-                        const tieneDatos = kpi.totalResultados && kpi.totalResultados > 0;
-                        const porcentaje = tieneDatos ? 75 : 30;
-                        return (
-                          <div key={idx} className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-foreground font-medium line-clamp-1">
-                                {kpi.nombre}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {kpi.importancia || 'N/A'}
-                              </span>
-                            </div>
-                            <Progress value={porcentaje} className="h-2" />
-                            {kpi.totalResultados !== undefined && (
-                              <p className="text-xs text-muted-foreground">
-                                {kpi.totalResultados} resultados disponibles
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
-
-                  {/* Detalles de todos los indicadores */}
-                  <div>
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-2xl font-bold text-foreground">
-                        Todos los indicadores - {dimension.nombre}
-                      </h3>
-                      <Button 
-                        variant="outline"
-                        onClick={() => {
-                          exportIndicadoresToCSV(dimensionKPIs, dimension.nombre);
-                        }}
-                        disabled={dimensionKPIs.length === 0}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Exportar todos a CSV
-                      </Button>
-                    </div>
-                    {dimensionKPIs.length === 0 ? (
-                      <Card className="p-6 bg-muted/50">
-                        <p className="text-muted-foreground text-center">
-                          No hay indicadores disponibles para esta dimensión
-                        </p>
-                      </Card>
-                    ) : (
-                      <div className="grid gap-6">
-                        {dimensionKPIs.map((kpi, index) => (
-                          <Card key={index} className="p-6 hover:shadow-medium transition-all border-l-4 border-l-primary">
-                            <div className="space-y-4">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                    {kpi.totalResultados && kpi.totalResultados > 0 ? (
-                                      <Badge className="bg-success/10 text-success">
-                                        Con datos ({kpi.totalResultados})
-                                      </Badge>
-                                    ) : (
-                                      <Badge className="bg-muted text-muted-foreground">
-                                        Sin datos
-                                      </Badge>
-                                    )}
-                                    {kpi.importancia && (
-                                      <Badge className={
-                                        kpi.importancia.toLowerCase().includes('alta') ? "bg-destructive/10 text-destructive" :
-                                        kpi.importancia.toLowerCase().includes('media') ? "bg-warning/10 text-warning" :
-                                        "bg-success/10 text-success"
-                                      }>
-                                        {kpi.importancia}
-                                      </Badge>
-                                    )}
-                                    {kpi.origen_indicador && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {kpi.origen_indicador}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <h4 className="text-xl font-semibold text-foreground mb-1">
-                                    {kpi.nombre}
-                                  </h4>
-                                  {kpi.subdimension && (
-                                    <p className="text-sm text-muted-foreground">
-                                      Subdimensión: {kpi.subdimension}
-                                    </p>
-                                  )}
-                                  {kpi.ultimoValor !== undefined && kpi.ultimoPeriodo && (
-                                    <p className="text-sm text-foreground mt-2">
-                                      Último valor ({kpi.ultimoPeriodo}): <strong>{kpi.ultimoValor.toFixed(2)}</strong>
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-
-                              {kpi.formula && (
-                                <div>
-                                  <h5 className="text-sm font-semibold text-foreground mb-1">
-                                    Fórmula de cálculo
-                                  </h5>
-                                  <p className="text-sm text-muted-foreground font-mono bg-muted/30 p-2 rounded">
-                                    {kpi.formula}
-                                  </p>
-                                </div>
-                              )}
-
-                              <div className="pt-4 border-t flex flex-wrap gap-4 text-xs text-muted-foreground">
-                                {kpi.origen_indicador && (
-                                  <div>
-                                    <span className="font-medium">Origen: </span>
-                                    {kpi.origen_indicador}
-                                  </div>
-                                )}
-                                {kpi.fuente && (
-                                  <div>
-                                    <span className="font-medium">Fuente: </span>
-                                    {kpi.fuente}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
+                <button
+                  key={item.label}
+                  onClick={() => item.href && navigate(item.href)}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors relative ${
+                    isActive
+                      ? "bg-[#0a5a73] text-white"
+                      : "text-blue-100 hover:bg-[#0a5a73]/50"
+                  }`}
+                  style={isActive ? {
+                    borderLeft: '4px solid #4FD1C7'
+                  } : {}}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </button>
               );
             })}
-          </Tabs>
+          </nav>
         </div>
-      </main>
+        
+        <div className="mt-auto p-6 border-t border-blue-600">
+          <p className="text-xs text-blue-200">Versión 2025</p>
+          <p className="text-xs text-blue-200">Actualizado Nov 2025</p>
+        </div>
+      </aside>
 
-      <FooterSection />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header */}
+        <header className="bg-blue-100 text-[#0c6c8b] px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-semibold">BRAINNOVA Economía Digital</h2>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Select value={selectedTerritorio} onValueChange={setSelectedTerritorio}>
+                <SelectTrigger className="w-48 bg-white border-gray-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Comunitat Valenciana">Comunitat Valenciana</SelectItem>
+                  <SelectItem value="España">España</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedAno} onValueChange={setSelectedAno}>
+                <SelectTrigger className="w-32 bg-white border-gray-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2024">2024</SelectItem>
+                  <SelectItem value="2023">2023</SelectItem>
+                  <SelectItem value="2022">2022</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedReferencia} onValueChange={setSelectedReferencia}>
+                <SelectTrigger className="w-40 bg-white border-gray-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Media UE">Media UE</SelectItem>
+                  <SelectItem value="Top UE">Top UE</SelectItem>
+                  <SelectItem value="España">España</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Button
+                variant={selectedView === "Tabla" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedView("Tabla")}
+                className={selectedView === "Tabla" ? "bg-[#0c6c8b] text-white" : ""}
+              >
+                Tabla
+              </Button>
+              <Button
+                variant={selectedView === "Gráfico" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedView("Gráfico")}
+                className={selectedView === "Gráfico" ? "bg-[#0c6c8b] text-white" : ""}
+              >
+                Gráfico
+              </Button>
+              <Button
+                variant={selectedView === "Mapa" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedView("Mapa")}
+                className={selectedView === "Mapa" ? "bg-[#0c6c8b] text-white" : ""}
+              >
+                Mapa
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="flex-1 p-8 overflow-y-auto bg-gray-50">
+          <div className="max-w-7xl mx-auto">
+            {/* Title Section */}
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-[#0c6c8b] mb-2">
+                Todos los Indicadores
+              </h1>
+              <p className="text-gray-600">
+                Repositorio completo de todos los indicadores del Sistema BRAINNOVA. Filtra por dimensión, subdimensión o busca por nombre para encontrar métricas específicas.
+              </p>
+            </div>
+
+            {/* Search and Filter Bar */}
+            <Card className="p-4 mb-6 bg-white">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-[300px]">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar indicador..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                
+                <Select value={selectedDimension} onValueChange={setSelectedDimension}>
+                  <SelectTrigger className="w-64 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Todas las dimensiones">Todas las dimensiones</SelectItem>
+                    {dimensiones?.map((dim) => (
+                      <SelectItem key={dim.nombre} value={dim.nombre}>
+                        {dim.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={selectedSubdimension} onValueChange={setSelectedSubdimension}>
+                  <SelectTrigger className="w-64 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Todas las subdimensiones">Todas las subdimensiones</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <Button
+                  onClick={handleExport}
+                  className="bg-[#0c6c8b] text-white hover:bg-[#0a5a73]"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar datos
+                </Button>
+              </div>
+            </Card>
+
+            {/* Indicator Count */}
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">
+                Mostrando {filteredIndicadores.length} de {indicadores?.length || 0} indicadores
+              </p>
+            </div>
+
+            {/* Indicators Table */}
+            {isLoading ? (
+              <Card className="p-12 text-center bg-white">
+                <Loader2 className="h-8 w-8 animate-spin text-[#0c6c8b] mx-auto mb-4" />
+                <p className="text-gray-600">Cargando indicadores...</p>
+              </Card>
+            ) : (
+              <Card className="bg-white overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Indicador</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Fórmula</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Dimensión</th>
+                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Valor Actual</th>
+                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Normalizado</th>
+                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Evolución</th>
+                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Tendencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredIndicadores.map((indicador, index) => {
+                        const normalized = getNormalizedValue(indicador.ultimoValor);
+                        const historico = historicoData?.[indicador.nombre] || [];
+                        const hasTrend = indicador.ultimoValor !== undefined;
+                        
+                        return (
+                          <tr 
+                            key={`${indicador.nombre}-${index}`}
+                            className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="py-4 px-4">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{indicador.nombre}</p>
+                                {indicador.subdimension && (
+                                  <p className="text-xs text-gray-500 mt-1">{indicador.subdimension}</p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="text-sm text-gray-600">{indicador.formula || "—"}</p>
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className="text-sm text-gray-700">{indicador.dimension || "—"}</span>
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              <span className="text-sm font-medium text-gray-900">
+                                {indicador.ultimoValor !== undefined 
+                                  ? `${indicador.ultimoValor.toFixed(1)}${indicador.ultimoValor > 1 ? '%' : ''}` 
+                                  : "—"}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium text-gray-700 w-10">{normalized}</span>
+                                <div className="flex-1">
+                                  <Progress value={normalized} className="h-2" />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              {historico.length > 0 ? (
+                                <div className="w-24 h-8 mx-auto">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <RechartsLineChart data={historico}>
+                                      <Line 
+                                        type="monotone" 
+                                        dataKey="valor" 
+                                        stroke="#0c6c8b" 
+                                        strokeWidth={2}
+                                        dot={false}
+                                      />
+                                    </RechartsLineChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 text-xs">—</span>
+                              )}
+                            </td>
+                            <td className="py-4 px-4 text-center">
+                              {hasTrend ? (
+                                <TrendingUp className="h-5 w-5 text-green-600 mx-auto" />
+                              ) : (
+                                <ArrowRight className="h-5 w-5 text-gray-400 mx-auto" />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

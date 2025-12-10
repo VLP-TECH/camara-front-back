@@ -239,3 +239,135 @@ export async function getDatosPorSubdimension(
   }
 }
 
+/**
+ * Obtiene datos detallados de subdimensiones con scores y comparativas
+ */
+export async function getSubdimensionesConScores(
+  nombreDimension: string,
+  pais: string = "Comunitat Valenciana",
+  periodo: number = 2024
+): Promise<Array<{
+  nombre: string;
+  score: number;
+  espana: number;
+  ue: number;
+  indicadores: number;
+}>> {
+  try {
+    const subdimensiones = await getSubdimensiones();
+    const subdimensionesFiltradas = subdimensiones.filter(
+      (sub) => sub.nombre_dimension === nombreDimension
+    );
+
+    const datos = await Promise.all(
+      subdimensionesFiltradas.map(async (sub) => {
+        // Obtener indicadores de esta subdimensión
+        const { data: indicadores } = await supabase
+          .from("definicion_indicadores")
+          .select("nombre")
+          .eq("nombre_subdimension", sub.nombre);
+
+        if (!indicadores || indicadores.length === 0) {
+          return {
+            nombre: sub.nombre,
+            score: 0,
+            espana: 0,
+            ue: 0,
+            indicadores: 0,
+          };
+        }
+
+        // Obtener valores promedio de los indicadores para el territorio seleccionado
+        const valoresTerritorio = await Promise.all(
+          indicadores.map(async (ind) => {
+            const { data } = await supabase
+              .from("resultado_indicadores")
+              .select("valor_calculado")
+              .eq("nombre_indicador", ind.nombre)
+              .eq("pais", pais)
+              .eq("periodo", periodo)
+              .limit(1);
+            return data?.[0]?.valor_calculado ? Number(data[0].valor_calculado) : null;
+          })
+        );
+
+        // Obtener valores promedio para España
+        const valoresEspana = await Promise.all(
+          indicadores.map(async (ind) => {
+            const { data } = await supabase
+              .from("resultado_indicadores")
+              .select("valor_calculado")
+              .eq("nombre_indicador", ind.nombre)
+              .eq("pais", "España")
+              .eq("periodo", periodo)
+              .limit(1);
+            return data?.[0]?.valor_calculado ? Number(data[0].valor_calculado) : null;
+          })
+        );
+
+        // Obtener valores promedio para UE (usando un país de referencia o promedio)
+        const valoresUE = await Promise.all(
+          indicadores.map(async (ind) => {
+            // Buscar valores de países UE (simplificado, usar promedio si hay varios)
+            const { data } = await supabase
+              .from("resultado_indicadores")
+              .select("valor_calculado")
+              .eq("nombre_indicador", ind.nombre)
+              .eq("periodo", periodo)
+              .in("pais", ["Alemania", "Francia", "Italia", "Países Bajos"])
+              .limit(4);
+            
+            if (data && data.length > 0) {
+              const promedio = data.reduce((sum, d) => sum + Number(d.valor_calculado || 0), 0) / data.length;
+              return promedio;
+            }
+            return null;
+          })
+        );
+
+        // Calcular promedios (normalizados a 0-100)
+        const calcularPromedio = (valores: (number | null)[]) => {
+          const valoresValidos = valores.filter(v => v !== null) as number[];
+          if (valoresValidos.length === 0) return 0;
+          const promedio = valoresValidos.reduce((sum, v) => sum + v, 0) / valoresValidos.length;
+          // Normalizar a escala 0-100 (ajustar según necesidad)
+          return Math.min(100, Math.max(0, promedio));
+        };
+
+        return {
+          nombre: sub.nombre,
+          score: calcularPromedio(valoresTerritorio),
+          espana: calcularPromedio(valoresEspana),
+          ue: calcularPromedio(valoresUE),
+          indicadores: indicadores.length,
+        };
+      })
+    );
+
+    return datos;
+  } catch (error) {
+    console.error("Error fetching subdimensiones con scores:", error);
+    return [];
+  }
+}
+
+/**
+ * Obtiene el score global de una dimensión
+ */
+export async function getDimensionScore(
+  nombreDimension: string,
+  pais: string = "Comunitat Valenciana",
+  periodo: number = 2024
+): Promise<number> {
+  try {
+    const subdimensiones = await getSubdimensionesConScores(nombreDimension, pais, periodo);
+    if (subdimensiones.length === 0) return 0;
+    
+    const promedio = subdimensiones.reduce((sum, sub) => sum + sub.score, 0) / subdimensiones.length;
+    return Math.round(promedio);
+  } catch (error) {
+    console.error("Error fetching dimension score:", error);
+    return 0;
+  }
+}
+

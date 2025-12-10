@@ -86,3 +86,4 @@ Frontend → Backend: http://backend-camara-vlc:8000
 - Si usas un servicio de DB en Easypanel, usa su nombre como `DB_HOST`
 
 
+

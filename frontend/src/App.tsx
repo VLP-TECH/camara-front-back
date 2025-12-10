@@ -18,6 +18,12 @@ import OpenData from "./pages/OpenData";
 import KPIsDashboard from "./pages/KPIsDashboard";
 import Tendencias from "./pages/Tendencias";
 import BrainnovaScore from "./pages/BrainnovaScore";
+import Metodologia from "./pages/Metodologia";
+import Informes from "./pages/Informes";
+import EvolucionTemporal from "./pages/EvolucionTemporal";
+import ComparacionTerritorial from "./pages/ComparacionTerritorial";
+import Dimensiones from "./pages/Dimensiones";
+import DimensionDetail from "./pages/DimensionDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +40,8 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dimensiones" element={<Dimensiones />} />
+              <Route path="/dimensiones/detalle" element={<DimensionDetail />} />
               <Route path="/admin-usuarios" element={<AdminDashboard />} />
               <Route path="/config" element={<AdminConfig />} />
               <Route path="/encuestas" element={<Surveys />} />
@@ -43,6 +51,10 @@ const App = () => (
               <Route path="/kpis" element={<KPIsDashboard />} />
               <Route path="/tendencias" element={<Tendencias />} />
               <Route path="/brainnova-score" element={<BrainnovaScore />} />
+              <Route path="/metodologia" element={<Metodologia />} />
+              <Route path="/informes" element={<Informes />} />
+              <Route path="/evolucion" element={<EvolucionTemporal />} />
+              <Route path="/comparacion" element={<ComparacionTerritorial />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
