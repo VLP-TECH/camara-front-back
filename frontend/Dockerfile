@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install dependencies first (for better caching)
 COPY package*.json ./
-RUN npm ci --only=production=false
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -34,7 +34,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Install only production dependencies (vite preview needs vite)
-RUN npm ci --only=production && \
+RUN npm ci --omit=dev && \
     npm cache clean --force
 
 # Switch to non-root user
