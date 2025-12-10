@@ -5,11 +5,12 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Install dependencies first (for better caching)
-COPY package*.json ./
+# Copy from frontend directory (build context is project root)
+COPY frontend/package*.json ./
 RUN npm ci
 
-# Copy source code
-COPY . .
+# Copy source code from frontend directory
+COPY frontend/ .
 
 # Build the application
 RUN npm run build
