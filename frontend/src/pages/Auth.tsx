@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
@@ -15,6 +16,9 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [razonSocial, setRazonSocial] = useState('');
+  const [cif, setCif] = useState('');
+  const [acceptPrivacyPolicy, setAcceptPrivacyPolicy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -24,9 +28,25 @@ const Auth = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [user, navigate]);
+
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return "La contraseña debe tener al menos 8 caracteres";
+    }
+    if (!/[0-9]/.test(password)) {
+      return "La contraseña debe contener al menos un número";
+    }
+    if (!/[a-z]/.test(password)) {
+      return "La contraseña debe contener al menos una letra minúscula";
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "La contraseña debe contener al menos una letra mayúscula";
+    }
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,10 +74,32 @@ const Auth = () => {
             title: "¡Bienvenido!",
             description: "Has iniciado sesión correctamente.",
           });
-          navigate('/');
+          navigate('/dashboard');
         }
       } else {
-        const { error } = await signUp(email, password, firstName, lastName);
+        if (!acceptPrivacyPolicy) {
+          toast({
+            title: "Política de privacidad",
+            description: "Debes aceptar la política de privacidad para registrarte.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // Validar contraseña
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+          toast({
+            title: "Contraseña inválida",
+            description: passwordError,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
+        const { error } = await signUp(email, password, firstName, lastName, razonSocial, cif);
         if (error) {
           if (error.message === 'User already registered') {
             toast({
@@ -75,8 +117,17 @@ const Auth = () => {
         } else {
           toast({
             title: "¡Registro exitoso!",
-            description: "Revisa tu email para confirmar tu cuenta.",
+            description: "En breve validaremos tu acceso. Recibirás una notificación cuando tu cuenta esté activa.",
           });
+          // Clear form and switch to login tab
+          setEmail('');
+          setPassword('');
+          setFirstName('');
+          setLastName('');
+          setRazonSocial('');
+          setCif('');
+          setAcceptPrivacyPolicy(false);
+          setIsLogin(true);
         }
       }
     } catch (error) {
@@ -211,11 +262,11 @@ const Auth = () => {
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Mín. 8 caracteres, números, letras y mayúsculas"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        minLength={6}
+                        minLength={8}
                         className="pr-10"
                       />
                       <Button
@@ -232,9 +283,61 @@ const Auth = () => {
                         )}
                       </Button>
                     </div>
+                    <p className="text-xs text-gray-500">
+                      La contraseña debe tener al menos 8 caracteres, incluir números, letras minúsculas y mayúsculas
+                    </p>
                   </div>
                   
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <div className="space-y-2">
+                    <Label htmlFor="razonSocial">Razón Social</Label>
+                    <Input
+                      id="razonSocial"
+                      type="text"
+                      placeholder="Razón Social"
+                      value={razonSocial}
+                      onChange={(e) => setRazonSocial(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="cif">CIF</Label>
+                    <Input
+                      id="cif"
+                      type="text"
+                      placeholder="CIF"
+                      value={cif}
+                      onChange={(e) => setCif(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="flex items-start space-x-2">
+                    <Checkbox
+                      id="privacyPolicy"
+                      checked={acceptPrivacyPolicy}
+                      onCheckedChange={(checked) => setAcceptPrivacyPolicy(checked === true)}
+                      required
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label
+                        htmlFor="privacyPolicy"
+                        className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        Aceptas la política de privacidad de Cámara Valencia. Puedes verla{' '}
+                        <a
+                          href="https://www.camaravalencia.com/politica-de-privacidad"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline hover:text-primary/80"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          aquí
+                        </a>
+                        .
+                      </Label>
+                    </div>
+                  </div>
+                  
+                  <Button type="submit" className="w-full" disabled={loading || !acceptPrivacyPolicy}>
                     {loading ? "Registrando..." : "Crear Cuenta"}
                   </Button>
                 </form>

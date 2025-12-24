@@ -5,7 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { 
   LayoutDashboard,
   Layers,
@@ -15,148 +14,89 @@ import {
   Clock,
   FileText,
   MessageSquare,
-  Building2,
-  Users,
-  Wifi,
-  Network,
-  Lightbulb,
-  Shield,
-  Leaf,
-  ArrowLeft,
-  ArrowRight,
   LogOut,
+  Shield,
   Download,
   GraduationCap,
   TrendingUp
 } from "lucide-react";
-import { 
-  getSubdimensionesConScores, 
-  getDimensionScore,
-  getSubdimensiones,
-  getIndicadoresConDatos,
+import {
+  getIndicadoresPorSubdimension,
   getDistribucionPorSubdimension,
   getDatosHistoricosIndicador,
+  getSubdimensiones,
+  getDimensiones,
   type IndicadorConDatos
 } from "@/lib/kpis-data";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
   LineChart as RechartsLineChart,
-  Line
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid
 } from "recharts";
 import { exportIndicadoresToCSV } from "@/lib/csv-export";
 
 const COLORS = ['#0c6c8b', '#3B82F6', '#F97316', '#10B981', '#8B5CF6', '#EF4444'];
 
-// Mapeo de dimensiones con sus iconos y descripciones
-const dimensionesInfo: Record<string, { icon: any; descripcion: string }> = {
-  "Transformación Digital Empresarial": {
-    icon: Building2,
-    descripcion: "Evaluación del grado de adopción de tecnologías digitales en el tejido empresarial valenciano, midiendo la integración de herramientas como ERP, CRM, Big Data, Cloud Computing y comercio electrónico."
-  },
-  "Capital Humano": {
-    icon: Users,
-    descripcion: "Disponibilidad y cualificación del talento digital en la región."
-  },
-  "Infraestructura Digital": {
-    icon: Wifi,
-    descripcion: "Calidad y penetración de redes de conectividad."
-  },
-  "Ecosistema y Colaboración": {
-    icon: Network,
-    descripcion: "Cooperación entre agentes del ecosistema digital."
-  },
-  "Emprendimiento e Innovación": {
-    icon: Lightbulb,
-    descripcion: "Ecosistema de apoyo a startups y proyectos innovadores."
-  },
-  "Servicios Públicos Digitales": {
-    icon: Shield,
-    descripcion: "Digitalización y accesibilidad de servicios públicos."
-  },
-  "Sostenibilidad Digital": {
-    icon: Leaf,
-    descripcion: "Impacto ambiental y eficiencia energética de la transformación digital."
-  },
-};
-
-const DimensionDetail = () => {
+const SubdimensionDashboard = () => {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { roles } = usePermissions();
   const [searchParams] = useSearchParams();
+  const subdimensionNombre = searchParams.get("subdimension") || "";
   const dimensionNombre = searchParams.get("dimension") || "";
-  
-  const [selectedTerritorio, setSelectedTerritorio] = useState("Comunitat Valenciana");
-  const [selectedAno, setSelectedAno] = useState("2024");
-  const [selectedReferencia, setSelectedReferencia] = useState("Media UE");
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
 
-  const dimensionInfo = dimensionesInfo[dimensionNombre] || {
-    icon: Layers,
-    descripcion: "Información detallada de la dimensión."
-  };
-  const Icon = dimensionInfo.icon;
+  // Obtener información de la subdimensión
+  const { data: subdimensiones } = useQuery({
+    queryKey: ["subdimensiones"],
+    queryFn: () => getSubdimensiones(),
+  });
 
-  // Obtener información de la dimensión desde Supabase
   const { data: dimensiones } = useQuery({
     queryKey: ["dimensiones"],
     queryFn: () => getDimensiones(),
   });
 
-  const dimensionInfoDB = dimensiones?.find(dim => dim.nombre === dimensionNombre);
+  const subdimensionInfo = subdimensiones?.find(sub => sub.nombre === subdimensionNombre);
+  const dimensionNombreFinal = dimensionNombre || subdimensionInfo?.nombre_dimension || "";
+  const dimensionInfo = dimensiones?.find(dim => dim.nombre === dimensionNombreFinal);
 
-  // Obtener score global de la dimensión
-  const { data: dimensionScore } = useQuery({
-    queryKey: ["dimension-score", dimensionNombre, selectedTerritorio, selectedAno],
-    queryFn: () => getDimensionScore(dimensionNombre, selectedTerritorio, Number(selectedAno)),
-    enabled: !!dimensionNombre,
+  // Obtener indicadores de la subdimensión
+  const { data: indicadores, isLoading } = useQuery({
+    queryKey: ["indicadores-subdimension", subdimensionNombre],
+    queryFn: () => getIndicadoresPorSubdimension(subdimensionNombre),
+    enabled: !!subdimensionNombre,
   });
 
-  // Obtener subdimensiones con scores
-  const { data: subdimensiones } = useQuery({
-    queryKey: ["subdimensiones-scores", dimensionNombre, selectedTerritorio, selectedAno],
-    queryFn: () => getSubdimensionesConScores(dimensionNombre, selectedTerritorio, Number(selectedAno)),
-    enabled: !!dimensionNombre,
-  });
-
-  // Obtener todos los indicadores de la dimensión
-  const { data: indicadores } = useQuery({
-    queryKey: ["indicadores-dimension", dimensionNombre],
-    queryFn: () => getIndicadoresConDatos(dimensionNombre),
-    enabled: !!dimensionNombre,
-  });
-
-  // Obtener distribución por subdimensión
+  // Obtener distribución por subdimensión si tenemos la dimensión
   const { data: distribucion } = useQuery({
-    queryKey: ["distribucion-dimension", dimensionNombre],
-    queryFn: () => getDistribucionPorSubdimension(dimensionNombre),
-    enabled: !!dimensionNombre,
+    queryKey: ["distribucion-subdimension", dimensionNombreFinal],
+    queryFn: () => getDistribucionPorSubdimension(dimensionNombreFinal),
+    enabled: !!dimensionNombreFinal,
   });
 
   // Obtener datos históricos para todos los indicadores
   const { data: historicoData } = useQuery({
-    queryKey: ["historico-dimension", indicadores?.map(i => i.nombre)],
+    queryKey: ["historico-subdimension", indicadores?.map(i => i.nombre)],
     queryFn: async () => {
       if (!indicadores) return {};
       const data: Record<string, Array<{ periodo: number; valor: number }>> = {};
       await Promise.all(
-        indicadores.slice(0, 5).map(async (ind) => {
+        indicadores.map(async (ind) => {
           if (ind.ultimoValor !== undefined) {
-            const historico = await getDatosHistoricosIndicador(ind.nombre, selectedTerritorio, 10);
+            const historico = await getDatosHistoricosIndicador(ind.nombre, "Comunitat Valenciana", 10);
             data[ind.nombre] = historico;
           }
         })
@@ -165,14 +105,6 @@ const DimensionDetail = () => {
     },
     enabled: !!indicadores && indicadores.length > 0,
   });
-
-  // Preparar datos para el gráfico de barras
-  const chartData = subdimensiones?.map(sub => ({
-    nombre: sub.nombre,
-    "Comunitat Valenciana": Math.round(sub.score),
-    "Media España": Math.round(sub.espana),
-    "Media UE": Math.round(sub.ue),
-  })) || [];
 
   // Preparar datos para el gráfico de pastel
   const pieData = distribucion?.map(sub => ({
@@ -186,14 +118,14 @@ const DimensionDetail = () => {
   
   if (historicoData && indicadores) {
     const periodos = new Set<number>();
-    indicadores.slice(0, 5).forEach(ind => {
+    indicadores.forEach(ind => {
       const historico = historicoData[ind.nombre] || [];
       historico.forEach(d => periodos.add(d.periodo));
     });
     
     Array.from(periodos).sort().forEach(periodo => {
       const punto: { periodo: number; [key: string]: number | string } = { periodo };
-      indicadores.slice(0, 5).forEach(ind => {
+      indicadores.forEach(ind => {
         const historico = historicoData[ind.nombre] || [];
         const valor = historico.find(d => d.periodo === periodo);
         if (valor) {
@@ -206,15 +138,13 @@ const DimensionDetail = () => {
 
   const handleExportCSV = () => {
     if (indicadores) {
-      exportIndicadoresToCSV(indicadores, `dimension-${dimensionNombre}`);
+      exportIndicadoresToCSV(indicadores, `subdimension-${subdimensionNombre}`);
     }
   };
 
-  const totalIndicadores = indicadores?.length || 0;
-
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard General", href: "/dashboard" },
-    { icon: Layers, label: "Dimensiones", href: "/dimensiones", active: true },
+    { icon: Layers, label: "Dimensiones", href: "/dimensiones" },
     { icon: LineChart, label: "Todos los Indicadores", href: "/kpis" },
     { icon: Map, label: "Comparación Territorial", href: "/comparacion" },
     { icon: Clock, label: "Evolución Temporal", href: "/evolucion" },
@@ -224,16 +154,19 @@ const DimensionDetail = () => {
     ...(roles.isAdmin ? [{ icon: Shield, label: "Gestión de Usuarios", href: "/admin-usuarios" }] : []),
   ];
 
-  if (!dimensionNombre) {
+  if (!subdimensionNombre) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Dimensión no encontrada</h1>
-          <Button onClick={() => navigate("/dimensiones")}>Volver a Dimensiones</Button>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Subdimensión no encontrada</h1>
+          <Button onClick={() => navigate("/kpis")}>Volver a KPIs</Button>
         </div>
       </div>
     );
   }
+
+  const totalIndicadores = indicadores?.length || 0;
+  const pesoDimension = dimensionInfo?.peso || 0;
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
@@ -252,22 +185,14 @@ const DimensionDetail = () => {
           
           <nav className="space-y-2">
             {menuItems.map((item) => {
-              const ItemIcon = item.icon;
-              const isActive = item.active;
+              const Icon = item.icon;
               return (
                 <button
                   key={item.label}
                   onClick={() => item.href && navigate(item.href)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors relative ${
-                    isActive
-                      ? "bg-[#0a5a73] text-white"
-                      : "text-blue-100 hover:bg-[#0a5a73]/50"
-                  }`}
-                  style={isActive ? {
-                    borderLeft: '4px solid #4FD1C7'
-                  } : {}}
+                  className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors text-blue-100 hover:bg-[#0a5a73]/50"
                 >
-                  <ItemIcon className="h-5 w-5" />
+                  <Icon className="h-5 w-5" />
                   <span className="text-sm font-medium">{item.label}</span>
                 </button>
               );
@@ -287,13 +212,7 @@ const DimensionDetail = () => {
         <header className="bg-blue-100 text-[#0c6c8b] px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate("/dimensiones")}
-                className="text-[#0c6c8b] hover:text-[#0a5a73] font-medium flex items-center space-x-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>← Volver a Dimensiones</span>
-              </button>
+              <h2 className="text-lg font-semibold">BRAINNOVA Economía Digital</h2>
             </div>
             
             <div className="flex items-center space-x-2">
@@ -329,11 +248,17 @@ const DimensionDetail = () => {
             </div>
 
             {/* Dimension Navigation */}
-            <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-              <span className="text-sm font-semibold text-[#0c6c8b] px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                {dimensionNombre}
-              </span>
-            </div>
+            {dimensionInfo && (
+              <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+                <span className="text-sm font-semibold text-gray-700 px-3 py-2 bg-white rounded-lg border border-gray-200">
+                  {dimensionInfo.nombre}
+                </span>
+                <span className="text-sm text-gray-500">→</span>
+                <span className="text-sm font-semibold text-[#0c6c8b] px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                  {subdimensionNombre}
+                </span>
+              </div>
+            )}
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -349,9 +274,9 @@ const DimensionDetail = () => {
                       <div className="text-3xl font-bold text-gray-900 mb-1">
                         {totalIndicadores}
                       </div>
-                      {dimensionInfoDB && (
+                      {dimensionInfo && (
                         <div className="text-xs text-gray-500">
-                          Peso: {dimensionInfoDB.peso || 0}%
+                          Peso: {pesoDimension}%
                         </div>
                       )}
                     </div>
@@ -375,12 +300,9 @@ const DimensionDetail = () => {
                           {indicador.nombre}
                         </p>
                         {indicador.subdimension && (
-                          <button
-                            onClick={() => navigate(`/kpis/subdimension?subdimension=${encodeURIComponent(indicador.subdimension)}&dimension=${encodeURIComponent(dimensionNombre)}`)}
-                            className="text-xs text-[#0c6c8b] hover:text-[#0a5a73] hover:underline cursor-pointer"
-                          >
+                          <p className="text-xs text-gray-500">
                             {indicador.subdimension}
-                          </button>
+                          </p>
                         )}
                       </div>
                     </div>
@@ -496,88 +418,6 @@ const DimensionDetail = () => {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Detalle de Subdimensiones - Clickable */}
-            <div>
-              <h2 className="text-2xl font-bold text-[#0c6c8b] mb-6">
-                Detalle de Subdimensiones
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {subdimensiones?.map((subdimension) => (
-                  <Card 
-                    key={subdimension.nombre} 
-                    className="bg-white border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => navigate(`/kpis/subdimension?subdimension=${encodeURIComponent(subdimension.nombre)}&dimension=${encodeURIComponent(dimensionNombre)}`)}
-                  >
-                    <CardContent className="p-6">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">
-                          {subdimension.nombre}
-                        </h3>
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <div className="text-4xl font-bold text-gray-900">
-                              {Math.round(subdimension.score)}
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">Comunitat Valenciana</div>
-                          </div>
-                          <div className="text-right space-y-1">
-                            <div className="text-sm text-gray-600">España: <span className="font-semibold">{Math.round(subdimension.espana)}</span></div>
-                            <div className="text-sm text-gray-600">UE: <span className="font-semibold">{Math.round(subdimension.ue)}</span></div>
-                          </div>
-                        </div>
-                        <Progress value={subdimension.score} className="h-2" />
-                      </div>
-                      <div className="flex items-center justify-end mt-4">
-                        <ArrowRight className="h-5 w-5 text-[#0c6c8b]" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            {/* Comparativa Regional */}
-            <Card className="bg-white">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold text-[#0c6c8b]">
-                  Comparativa Regional
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {chartData.length > 0 ? (
-                  <div>
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="nombre" 
-                          angle={-45}
-                          textAnchor="end"
-                          height={120}
-                          interval={0}
-                          tick={{ fontSize: 12, fill: '#6b7280' }}
-                        />
-                        <YAxis 
-                          domain={[0, 100]}
-                          tick={{ fontSize: 12, fill: '#6b7280' }}
-                          ticks={[0, 25, 50, 75, 100]}
-                        />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="Comunitat Valenciana" fill="#0c6c8b" />
-                        <Bar dataKey="Media España" fill="#3B82F6" />
-                        <Bar dataKey="Media UE" fill="#93C5FD" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No hay datos disponibles para mostrar
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </main>
       </div>
@@ -585,5 +425,5 @@ const DimensionDetail = () => {
   );
 };
 
-export default DimensionDetail;
+export default SubdimensionDashboard;
 

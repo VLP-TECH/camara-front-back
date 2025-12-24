@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { 
   LayoutDashboard,
   Layers,
@@ -19,7 +20,8 @@ import {
   MessageSquare,
   ArrowLeft,
   Send,
-  Loader2
+  Loader2,
+  Shield
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +43,7 @@ interface Question {
 const SurveyForm = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { roles } = usePermissions();
   const navigate = useNavigate();
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -130,6 +133,7 @@ const SurveyForm = () => {
     { icon: FileText, label: "Informes", href: "/informes" },
     { icon: MessageSquare, label: "Encuestas", href: "/encuestas", active: true },
     { icon: BookOpen, label: "Metodología", href: "/metodologia" },
+    ...(roles.isAdmin ? [{ icon: Shield, label: "Gestión de Usuarios", href: "/admin-usuarios" }] : []),
   ];
 
   if (loading) {

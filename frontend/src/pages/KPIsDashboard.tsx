@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +27,9 @@ import {
   TrendingUp,
   ArrowRight,
   Loader2,
-  MessageSquare
+  MessageSquare,
+  LogOut,
+  Shield
 } from "lucide-react";
 import {
   LineChart as RechartsLineChart,
@@ -45,10 +49,16 @@ import { exportIndicadoresToCSV } from "@/lib/csv-export";
 
 const KPIsDashboard = () => {
   const navigate = useNavigate();
+  const { signOut, user } = useAuth();
+  const { roles } = usePermissions();
   const [selectedTerritorio, setSelectedTerritorio] = useState("Comunitat Valenciana");
   const [selectedAno, setSelectedAno] = useState("2024");
   const [selectedReferencia, setSelectedReferencia] = useState("Media UE");
-  const [selectedView, setSelectedView] = useState("Tabla");
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDimension, setSelectedDimension] = useState("Todas las dimensiones");
   const [selectedSubdimension, setSelectedSubdimension] = useState("Todas las subdimensiones");
@@ -75,6 +85,14 @@ const KPIsDashboard = () => {
       ind.subdimension === selectedSubdimension;
     
     return matchesSearch && matchesDimension && matchesSubdimension;
+  })
+  // Ordenar: primero los activos (con datos), luego los inactivos
+  .sort((a, b) => {
+    const aActivo = a.activo || a.ultimoValor !== undefined;
+    const bActivo = b.activo || b.ultimoValor !== undefined;
+    if (aActivo && !bActivo) return -1; // a activo, b no -> a primero
+    if (!aActivo && bActivo) return 1;  // a no activo, b sí -> b primero
+    return 0; // ambos activos o inactivos -> mantener orden original
   }) || [];
 
   // Obtener datos históricos para gráficos de evolución
@@ -119,6 +137,7 @@ const KPIsDashboard = () => {
     { icon: FileText, label: "Informes", href: "/informes" },
     { icon: MessageSquare, label: "Encuestas", href: "/encuestas" },
     { icon: BookOpen, label: "Metodología", href: "/metodologia" },
+    ...(roles.isAdmin ? [{ icon: Shield, label: "Gestión de Usuarios", href: "/admin-usuarios" }] : []),
   ];
 
   return (
@@ -176,65 +195,18 @@ const KPIsDashboard = () => {
               <h2 className="text-lg font-semibold">BRAINNOVA Economía Digital</h2>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <Select value={selectedTerritorio} onValueChange={setSelectedTerritorio}>
-                <SelectTrigger className="w-48 bg-white border-gray-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Comunitat Valenciana">Comunitat Valenciana</SelectItem>
-                  <SelectItem value="España">España</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={selectedAno} onValueChange={setSelectedAno}>
-                <SelectTrigger className="w-32 bg-white border-gray-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2024">2024</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={selectedReferencia} onValueChange={setSelectedReferencia}>
-                <SelectTrigger className="w-40 bg-white border-gray-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Media UE">Media UE</SelectItem>
-                  <SelectItem value="Top UE">Top UE</SelectItem>
-                  <SelectItem value="España">España</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
             <div className="flex items-center space-x-2">
-              <Button
-                variant={selectedView === "Tabla" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedView("Tabla")}
-                className={selectedView === "Tabla" ? "bg-[#0c6c8b] text-white" : ""}
-              >
-                Tabla
-              </Button>
-              <Button
-                variant={selectedView === "Gráfico" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedView("Gráfico")}
-                className={selectedView === "Gráfico" ? "bg-[#0c6c8b] text-white" : ""}
-              >
-                Gráfico
-              </Button>
-              <Button
-                variant={selectedView === "Mapa" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedView("Mapa")}
-                className={selectedView === "Mapa" ? "bg-[#0c6c8b] text-white" : ""}
-              >
-                Mapa
-              </Button>
+              {user && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="flex items-center space-x-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Salir</span>
+                </Button>
+              )}
             </div>
           </div>
         </header>
@@ -320,11 +292,9 @@ const KPIsDashboard = () => {
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Indicador</th>
-                        <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Fórmula</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Dimensión</th>
                         <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Valor Actual</th>
                         <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Normalizado</th>
-                        <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Evolución</th>
                         <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Tendencia</th>
                       </tr>
                     </thead>
@@ -332,29 +302,44 @@ const KPIsDashboard = () => {
                       {filteredIndicadores.map((indicador, index) => {
                         const normalized = getNormalizedValue(indicador.ultimoValor);
                         const historico = historicoData?.[indicador.nombre] || [];
+                        const hasData = indicador.activo || indicador.ultimoValor !== undefined;
                         const hasTrend = indicador.ultimoValor !== undefined;
+                        
+                        // Clases para indicadores sin datos (gris/deshabilitado)
+                        const disabledClass = hasData ? "" : "opacity-50 bg-gray-50";
+                        const textDisabledClass = hasData ? "" : "text-gray-400";
                         
                         return (
                           <tr 
                             key={`${indicador.nombre}-${index}`}
-                            className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                            className={`border-b border-gray-100 transition-colors ${disabledClass} ${hasData ? "hover:bg-gray-50" : ""}`}
                           >
                             <td className="py-4 px-4">
                               <div>
-                                <p className="text-sm font-medium text-gray-900">{indicador.nombre}</p>
+                                <p className={`text-sm font-medium ${hasData ? "text-gray-900" : "text-gray-400"}`}>
+                                  {indicador.nombre}
+                                </p>
                                 {indicador.subdimension && (
-                                  <p className="text-xs text-gray-500 mt-1">{indicador.subdimension}</p>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/kpis/subdimension?subdimension=${encodeURIComponent(indicador.subdimension)}&dimension=${encodeURIComponent(indicador.dimension || "")}`);
+                                    }}
+                                    className={`text-xs mt-1 ${hasData ? "text-[#0c6c8b] hover:text-[#0a5a73] hover:underline cursor-pointer" : "text-gray-300 cursor-not-allowed"}`}
+                                    disabled={!hasData}
+                                  >
+                                    {indicador.subdimension}
+                                  </button>
                                 )}
                               </div>
                             </td>
                             <td className="py-4 px-4">
-                              <p className="text-sm text-gray-600">{indicador.formula || "—"}</p>
-                            </td>
-                            <td className="py-4 px-4">
-                              <span className="text-sm text-gray-700">{indicador.dimension || "—"}</span>
+                              <span className={`text-sm ${hasData ? "text-gray-700" : "text-gray-400"}`}>
+                                {indicador.dimension || "—"}
+                              </span>
                             </td>
                             <td className="py-4 px-4 text-center">
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className={`text-sm font-medium ${hasData ? "text-gray-900" : "text-gray-400"}`}>
                                 {indicador.ultimoValor !== undefined 
                                   ? `${indicador.ultimoValor.toFixed(1)}${indicador.ultimoValor > 1 ? '%' : ''}` 
                                   : "—"}
@@ -362,34 +347,20 @@ const KPIsDashboard = () => {
                             </td>
                             <td className="py-4 px-4">
                               <div className="flex items-center space-x-2">
-                                <span className="text-sm font-medium text-gray-700 w-10">{normalized}</span>
+                                <span className={`text-sm font-medium w-16 ${hasData ? "text-gray-700" : "text-gray-400"}`}>
+                                  {normalized.toFixed(3)}
+                                </span>
                                 <div className="flex-1">
-                                  <Progress value={normalized} className="h-2" />
+                                  <Progress 
+                                    value={normalized} 
+                                    className={`h-2 ${hasData ? "" : "opacity-30"}`} 
+                                  />
                                 </div>
                               </div>
                             </td>
-                            <td className="py-4 px-4">
-                              {historico.length > 0 ? (
-                                <div className="w-24 h-8 mx-auto">
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <RechartsLineChart data={historico}>
-                                      <Line 
-                                        type="monotone" 
-                                        dataKey="valor" 
-                                        stroke="#0c6c8b" 
-                                        strokeWidth={2}
-                                        dot={false}
-                                      />
-                                    </RechartsLineChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 text-xs">—</span>
-                              )}
-                            </td>
                             <td className="py-4 px-4 text-center">
                               {hasTrend ? (
-                                <TrendingUp className="h-5 w-5 text-green-600 mx-auto" />
+                                <TrendingUp className={`h-5 w-5 mx-auto ${hasData ? "text-green-600" : "text-gray-400"}`} />
                               ) : (
                                 <ArrowRight className="h-5 w-5 text-gray-400 mx-auto" />
                               )}

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ChatWidget from "@/components/ChatWidget";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -24,6 +25,7 @@ import EvolucionTemporal from "./pages/EvolucionTemporal";
 import ComparacionTerritorial from "./pages/ComparacionTerritorial";
 import Dimensiones from "./pages/Dimensiones";
 import DimensionDetail from "./pages/DimensionDetail";
+import SubdimensionDashboard from "./pages/SubdimensionDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,22 +41,142 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dimensiones" element={<Dimensiones />} />
-              <Route path="/dimensiones/detalle" element={<DimensionDetail />} />
-              <Route path="/admin-usuarios" element={<AdminDashboard />} />
-              <Route path="/config" element={<AdminConfig />} />
-              <Route path="/encuestas" element={<Surveys />} />
-              <Route path="/encuestas/crear" element={<CreateSurvey />} />
-              <Route path="/encuestas/:id" element={<SurveyForm />} />
-              <Route path="/datos-abiertos" element={<OpenData />} />
-              <Route path="/kpis" element={<KPIsDashboard />} />
-              <Route path="/tendencias" element={<Tendencias />} />
-              <Route path="/brainnova-score" element={<BrainnovaScore />} />
-              <Route path="/metodologia" element={<Metodologia />} />
-              <Route path="/informes" element={<Informes />} />
-              <Route path="/evolucion" element={<EvolucionTemporal />} />
-              <Route path="/comparacion" element={<ComparacionTerritorial />} />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/dimensiones" 
+                element={
+                  <ProtectedRoute>
+                    <Dimensiones />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/dimensiones/detalle" 
+                element={
+                  <ProtectedRoute>
+                    <DimensionDetail />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/kpis/subdimension" 
+                element={
+                  <ProtectedRoute>
+                    <SubdimensionDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin-usuarios" 
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/config" 
+                element={
+                  <ProtectedRoute>
+                    <AdminConfig />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/encuestas" 
+                element={
+                  <ProtectedRoute>
+                    <Surveys />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/encuestas/crear" 
+                element={
+                  <ProtectedRoute>
+                    <CreateSurvey />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/encuestas/:id" 
+                element={
+                  <ProtectedRoute>
+                    <SurveyForm />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/datos-abiertos" 
+                element={
+                  <ProtectedRoute>
+                    <OpenData />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/kpis" 
+                element={
+                  <ProtectedRoute>
+                    <KPIsDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/tendencias" 
+                element={
+                  <ProtectedRoute>
+                    <Tendencias />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/brainnova-score" 
+                element={
+                  <ProtectedRoute>
+                    <BrainnovaScore />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/metodologia" 
+                element={
+                  <ProtectedRoute>
+                    <Metodologia />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/informes" 
+                element={
+                  <ProtectedRoute>
+                    <Informes />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/evolucion" 
+                element={
+                  <ProtectedRoute>
+                    <EvolucionTemporal />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/comparacion" 
+                element={
+                  <ProtectedRoute>
+                    <ComparacionTerritorial />
+                  </ProtectedRoute>
+                } 
+              />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

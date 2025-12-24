@@ -17,7 +17,8 @@ import {
   FileText as FileTextIcon,
   Calendar,
   Users,
-  Plus
+  Plus,
+  Shield
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,7 +34,7 @@ const Surveys = () => {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const { permissions } = usePermissions();
+  const { permissions, roles } = usePermissions();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -86,6 +87,7 @@ const Surveys = () => {
     { icon: FileText, label: "Informes", href: "/informes" },
     { icon: MessageSquare, label: "Encuestas", href: "/encuestas", active: true },
     { icon: BookOpen, label: "Metodología", href: "/metodologia" },
+    ...(roles.isAdmin ? [{ icon: Shield, label: "Gestión de Usuarios", href: "/admin-usuarios" }] : []),
   ];
 
   return (

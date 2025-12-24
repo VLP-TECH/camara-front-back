@@ -20,6 +20,7 @@ export interface Indicador {
   formula: string | null;
   fuente: string | null;
   origen_indicador: string | null;
+  activo?: boolean;
 }
 
 export interface IndicadorConDatos extends Indicador {
@@ -28,6 +29,7 @@ export interface IndicadorConDatos extends Indicador {
   ultimoValor?: number;
   ultimoPeriodo?: number;
   totalResultados?: number;
+  activo?: boolean;
 }
 
 /**
@@ -78,10 +80,22 @@ export async function getSubdimensiones(): Promise<Subdimension[]> {
  */
 export async function getIndicadores(): Promise<Indicador[]> {
   try {
-    const { data, error } = await supabase
+    // Intentar obtener con el campo activo, pero si falla, obtener sin él
+    let { data, error } = await supabase
       .from("definicion_indicadores")
-      .select("nombre, nombre_subdimension, importancia, formula, fuente, origen_indicador")
+      .select("nombre, nombre_subdimension, importancia, formula, fuente, origen_indicador, activo")
       .order("nombre");
+
+    // Si hay error relacionado con el campo activo, intentar sin él
+    if (error && error.message?.includes("activo")) {
+      const { data: dataWithoutActivo, error: errorWithoutActivo } = await supabase
+        .from("definicion_indicadores")
+        .select("nombre, nombre_subdimension, importancia, formula, fuente, origen_indicador")
+        .order("nombre");
+      
+      if (errorWithoutActivo) throw errorWithoutActivo;
+      return (dataWithoutActivo || []).map(ind => ({ ...ind, activo: undefined }));
+    }
 
     if (error) throw error;
     return data || [];
@@ -135,18 +149,35 @@ export async function getIndicadoresConDatos(
           .select("id", { count: "exact", head: true })
           .eq("nombre_indicador", ind.nombre);
 
+        const ultimoValor = resultados?.[0]?.valor_calculado
+          ? Number(resultados[0].valor_calculado)
+          : undefined;
+        
+        // Si tiene datos pero no está activo en BD, el trigger lo activará automáticamente
+        // Por ahora usamos el campo activo de la BD o determinamos por ultimoValor
+        const tieneDatos = ultimoValor !== undefined;
+        const activo = ind.activo !== undefined ? ind.activo : tieneDatos;
+
         return {
           ...ind,
           dimension: subdimMap.get(ind.nombre_subdimension) || "",
           subdimension: ind.nombre_subdimension,
-          ultimoValor: resultados?.[0]?.valor_calculado
-            ? Number(resultados[0].valor_calculado)
-            : undefined,
+          ultimoValor,
           ultimoPeriodo: resultados?.[0]?.periodo || undefined,
           totalResultados: count || 0,
+          activo,
         };
       })
     );
+
+    // Ordenar: primero los activos (con datos), luego los inactivos
+    indicadoresConDatos.sort((a, b) => {
+      const aActivo = a.activo || a.ultimoValor !== undefined;
+      const bActivo = b.activo || b.ultimoValor !== undefined;
+      if (aActivo && !bActivo) return -1;
+      if (!aActivo && bActivo) return 1;
+      return 0;
+    });
 
     return indicadoresConDatos;
   } catch (error) {
@@ -254,20 +285,27 @@ export async function getSubdimensionesConScores(
   indicadores: number;
 }>> {
   try {
+    console.log("getSubdimensionesConScores - nombreDimension:", nombreDimension, "pais:", pais, "periodo:", periodo);
     const subdimensiones = await getSubdimensiones();
     const subdimensionesFiltradas = subdimensiones.filter(
       (sub) => sub.nombre_dimension === nombreDimension
     );
+    console.log("Subdimensiones filtradas:", subdimensionesFiltradas.length, subdimensionesFiltradas.map(s => s.nombre));
 
     const datos = await Promise.all(
       subdimensionesFiltradas.map(async (sub) => {
         // Obtener indicadores de esta subdimensión
-        const { data: indicadores } = await supabase
+        const { data: indicadores, error: indicadoresError } = await supabase
           .from("definicion_indicadores")
           .select("nombre")
           .eq("nombre_subdimension", sub.nombre);
 
+        if (indicadoresError) {
+          console.error("Error obteniendo indicadores para subdimensión", sub.nombre, indicadoresError);
+        }
+
         if (!indicadores || indicadores.length === 0) {
+          console.log("No hay indicadores para subdimensión:", sub.nombre);
           return {
             nombre: sub.nombre,
             score: 0,
@@ -276,17 +314,56 @@ export async function getSubdimensionesConScores(
             indicadores: 0,
           };
         }
+        
+        console.log(`Subdimensión ${sub.nombre}: ${indicadores.length} indicadores encontrados`);
 
         // Obtener valores promedio de los indicadores para el territorio seleccionado
         const valoresTerritorio = await Promise.all(
           indicadores.map(async (ind) => {
-            const { data } = await supabase
-              .from("resultado_indicadores")
-              .select("valor_calculado")
-              .eq("nombre_indicador", ind.nombre)
-              .eq("pais", pais)
-              .eq("periodo", periodo)
-              .limit(1);
+            // Mapeo de nombres de país comunes
+            const paisVariations: Record<string, string[]> = {
+              "Comunitat Valenciana": ["Comunitat Valenciana", "Comunidad Valenciana", "Valencia", "CV"],
+              "España": ["España", "Spain", "Esp"]
+            };
+            
+            const variations = paisVariations[pais] || [pais];
+            let data = null;
+            
+            // Intentar con cada variación del nombre del país
+            for (const paisVar of variations) {
+              // Primero intentar con el periodo exacto
+              let { data: periodData } = await supabase
+                .from("resultado_indicadores")
+                .select("valor_calculado, periodo")
+                .eq("nombre_indicador", ind.nombre)
+                .eq("pais", paisVar)
+                .eq("periodo", periodo)
+                .limit(1);
+              
+              if (periodData && periodData.length > 0) {
+                data = periodData;
+                break;
+              }
+              
+              // Si no hay datos para ese periodo, buscar el último periodo disponible
+              const { data: lastData } = await supabase
+                .from("resultado_indicadores")
+                .select("valor_calculado, periodo")
+                .eq("nombre_indicador", ind.nombre)
+                .eq("pais", paisVar)
+                .order("periodo", { ascending: false })
+                .limit(1);
+              
+              if (lastData && lastData.length > 0) {
+                data = lastData;
+                break;
+              }
+            }
+            
+            if (!data || data.length === 0) {
+              console.log(`No se encontraron datos para indicador ${ind.nombre} en país ${pais} (variaciones: ${variations.join(", ")})`);
+            }
+            
             return data?.[0]?.valor_calculado ? Number(data[0].valor_calculado) : null;
           })
         );
@@ -294,13 +371,27 @@ export async function getSubdimensionesConScores(
         // Obtener valores promedio para España
         const valoresEspana = await Promise.all(
           indicadores.map(async (ind) => {
-            const { data } = await supabase
+            // Primero intentar con el periodo exacto
+            let { data } = await supabase
               .from("resultado_indicadores")
-              .select("valor_calculado")
+              .select("valor_calculado, periodo")
               .eq("nombre_indicador", ind.nombre)
               .eq("pais", "España")
               .eq("periodo", periodo)
               .limit(1);
+            
+            // Si no hay datos para ese periodo, buscar el último periodo disponible
+            if (!data || data.length === 0) {
+              const { data: lastData } = await supabase
+                .from("resultado_indicadores")
+                .select("valor_calculado, periodo")
+                .eq("nombre_indicador", ind.nombre)
+                .eq("pais", "España")
+                .order("periodo", { ascending: false })
+                .limit(1);
+              data = lastData;
+            }
+            
             return data?.[0]?.valor_calculado ? Number(data[0].valor_calculado) : null;
           })
         );
@@ -328,17 +419,27 @@ export async function getSubdimensionesConScores(
         // Calcular promedios (normalizados a 0-100)
         const calcularPromedio = (valores: (number | null)[]) => {
           const valoresValidos = valores.filter(v => v !== null) as number[];
-          if (valoresValidos.length === 0) return 0;
+          if (valoresValidos.length === 0) {
+            console.log(`No hay valores válidos para ${sub.nombre}. Total valores: ${valores.length}, Válidos: 0`);
+            return 0;
+          }
           const promedio = valoresValidos.reduce((sum, v) => sum + v, 0) / valoresValidos.length;
+          console.log(`Promedio calculado para ${sub.nombre}: ${promedio} (de ${valoresValidos.length} valores válidos)`);
           // Normalizar a escala 0-100 (ajustar según necesidad)
           return Math.min(100, Math.max(0, promedio));
         };
 
+        const score = calcularPromedio(valoresTerritorio);
+        const espana = calcularPromedio(valoresEspana);
+        const ue = calcularPromedio(valoresUE);
+
+        console.log(`Resultado para ${sub.nombre}: score=${score}, espana=${espana}, ue=${ue}`);
+
         return {
           nombre: sub.nombre,
-          score: calcularPromedio(valoresTerritorio),
-          espana: calcularPromedio(valoresEspana),
-          ue: calcularPromedio(valoresUE),
+          score,
+          espana,
+          ue,
           indicadores: indicadores.length,
         };
       })
@@ -368,6 +469,66 @@ export async function getDimensionScore(
   } catch (error) {
     console.error("Error fetching dimension score:", error);
     return 0;
+  }
+}
+
+/**
+ * Obtiene los indicadores de una subdimensión específica
+ */
+export async function getIndicadoresPorSubdimension(
+  nombreSubdimension: string,
+  pais: string = "Comunitat Valenciana",
+  periodo: number = 2024
+): Promise<IndicadorConDatos[]> {
+  try {
+    const indicadores = await getIndicadoresConDatos();
+    return indicadores.filter(ind => ind.subdimension === nombreSubdimension);
+  } catch (error) {
+    console.error("Error fetching indicadores por subdimension:", error);
+    return [];
+  }
+}
+
+/**
+ * Obtiene la distribución de indicadores por subdimensión dentro de una dimensión
+ */
+export async function getDistribucionPorSubdimension(
+  nombreDimension: string,
+  pais: string = "Comunitat Valenciana",
+  periodo: number = 2024
+): Promise<Array<{
+  nombre: string;
+  porcentaje: number;
+  totalIndicadores: number;
+}>> {
+  try {
+    const subdimensiones = await getSubdimensiones();
+    const subdimensionesFiltradas = subdimensiones.filter(
+      (sub) => sub.nombre_dimension === nombreDimension
+    );
+
+    const indicadores = await getIndicadoresConDatos();
+    
+    const distribucion = await Promise.all(
+      subdimensionesFiltradas.map(async (sub) => {
+        const indicadoresSub = indicadores.filter(ind => ind.subdimension === sub.nombre);
+        return {
+          nombre: sub.nombre,
+          totalIndicadores: indicadoresSub.length,
+          porcentaje: 0 // Se calculará después
+        };
+      })
+    );
+
+    const totalIndicadores = distribucion.reduce((sum, sub) => sum + sub.totalIndicadores, 0);
+    
+    return distribucion.map(sub => ({
+      ...sub,
+      porcentaje: totalIndicadores > 0 ? Math.round((sub.totalIndicadores / totalIndicadores) * 100) : 0
+    }));
+  } catch (error) {
+    console.error("Error fetching distribucion por subdimension:", error);
+    return [];
   }
 }
 

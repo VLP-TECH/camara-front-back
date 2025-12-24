@@ -1,10 +1,30 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TrendingUp, Activity, Zap, ArrowRight } from "lucide-react";
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  const handleAccessDashboard = () => {
+    // Si está cargando, redirigir a /auth de todas formas para forzar login
+    if (loading) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+    
+    // Verificar explícitamente si hay usuario
+    // Si NO hay usuario, SIEMPRE redirigir a /auth
+    if (!user) {
+      navigate('/auth', { replace: true });
+      return;
+    }
+    
+    // Si hay usuario, ir al dashboard
+    navigate('/dashboard');
+  };
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0c6c8b]">
@@ -78,7 +98,7 @@ const HeroSection = () => {
             <Button 
               size="lg" 
               className="bg-white hover:bg-gray-50 text-[#0c6c8b] text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 font-bold"
-              onClick={() => navigate('/dashboard')}
+              onClick={handleAccessDashboard}
             >
               Acceder al Dashboard
               <ArrowRight className="h-5 w-5 text-[#0c6c8b]" />

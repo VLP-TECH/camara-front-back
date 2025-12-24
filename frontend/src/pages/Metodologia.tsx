@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -21,15 +23,23 @@ import {
   CheckCircle2,
   Download,
   ArrowRight,
-  MessageSquare
+  MessageSquare,
+  Shield,
+  LogOut
 } from "lucide-react";
 
 const Metodologia = () => {
   const navigate = useNavigate();
+  const { signOut, user } = useAuth();
+  const { roles } = usePermissions();
   const [selectedTerritorio, setSelectedTerritorio] = useState("Comunitat Valenciana");
   const [selectedAno, setSelectedAno] = useState("2024");
   const [selectedReferencia, setSelectedReferencia] = useState("Media UE");
-  const [selectedView, setSelectedView] = useState("Gráfico");
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard General", href: "/dashboard" },
@@ -40,6 +50,7 @@ const Metodologia = () => {
     { icon: FileText, label: "Informes", href: "/informes" },
     { icon: MessageSquare, label: "Encuestas", href: "/encuestas" },
     { icon: BookOpen, label: "Metodología", href: "/metodologia", active: true },
+    ...(roles.isAdmin ? [{ icon: Shield, label: "Gestión de Usuarios", href: "/admin-usuarios" }] : []),
   ];
 
   const dimensiones = [
@@ -108,65 +119,18 @@ const Metodologia = () => {
               <h2 className="text-lg font-semibold">BRAINNOVA Economía Digital</h2>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <Select value={selectedTerritorio} onValueChange={setSelectedTerritorio}>
-                <SelectTrigger className="w-48 bg-white border-gray-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Comunitat Valenciana">Comunitat Valenciana</SelectItem>
-                  <SelectItem value="España">España</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={selectedAno} onValueChange={setSelectedAno}>
-                <SelectTrigger className="w-32 bg-white border-gray-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2024">2024</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={selectedReferencia} onValueChange={setSelectedReferencia}>
-                <SelectTrigger className="w-40 bg-white border-gray-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Media UE">Media UE</SelectItem>
-                  <SelectItem value="Top UE">Top UE</SelectItem>
-                  <SelectItem value="España">España</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
             <div className="flex items-center space-x-2">
-              <Button
-                variant={selectedView === "Tabla" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedView("Tabla")}
-                className={selectedView === "Tabla" ? "bg-[#0c6c8b] text-white" : ""}
-              >
-                Tabla
-              </Button>
-              <Button
-                variant={selectedView === "Gráfico" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedView("Gráfico")}
-                className={selectedView === "Gráfico" ? "bg-[#0c6c8b] text-white" : ""}
-              >
-                Gráfico
-              </Button>
-              <Button
-                variant={selectedView === "Mapa" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedView("Mapa")}
-                className={selectedView === "Mapa" ? "bg-[#0c6c8b] text-white" : ""}
-              >
-                Mapa
-              </Button>
+              {user && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="flex items-center space-x-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Salir</span>
+                </Button>
+              )}
             </div>
           </div>
         </header>

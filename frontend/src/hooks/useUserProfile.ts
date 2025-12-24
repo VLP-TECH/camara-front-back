@@ -7,7 +7,8 @@ interface UserProfile {
   user_id: string;
   first_name: string | null;
   last_name: string | null;
-  organization: string | null;
+  razon_social: string | null;
+  cif: string | null;
   role: string;
   active: boolean;
   created_at: string;
