@@ -334,7 +334,7 @@ const ComparacionTerritorial = () => {
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                   <div className="flex-1">
                     <p className="text-white/90 leading-relaxed">
-                      Valencia lidera el ranking provincial (69.5 pts) destacando en Capital Humano, seguida de Alicante (66.8 pts) con fortaleza en Infraestructura Digital. Castellón (64.3 pts) muestra oportunidades de mejora especialmente en Emprendimiento e Innovación.
+                      Valencia lidera el ranking provincial (69.5 pts) destacando en Capital Humano, seguida de Alicante (66.8 pts) con fortaleza en Infraestructura Digital. Castellón (64.3 pts) muestra oportunidades de mejora especialmente en Apoyo al emprendimiento e innovación.
                     </p>
                   </div>
                   <div className="flex flex-col md:flex-row gap-4">

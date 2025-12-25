@@ -57,7 +57,7 @@ const Dashboard = () => {
     { dimension: "Capital Humano", cv: 70, ue: 65, topUE: 90 },
     { dimension: "Infraestructura Digital", cv: 75, ue: 70, topUE: 95 },
     { dimension: "Ecosistema y Colaboración", cv: 68, ue: 63, topUE: 88 },
-    { dimension: "Emprendimiento e Innovación", cv: 58, ue: 55, topUE: 80 },
+    { dimension: "Apoyo al emprendimiento e innovación", cv: 58, ue: 55, topUE: 80 },
     { dimension: "Servicios Públicos", cv: 72, ue: 68, topUE: 92 },
     { dimension: "Sostenibilidad Digital", cv: 66, ue: 62, topUE: 87 },
   ];

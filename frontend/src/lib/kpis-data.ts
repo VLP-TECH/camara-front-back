@@ -133,6 +133,10 @@ export async function getIndicadoresConDatos(
       subdimensiones.map((sub) => [sub.nombre, sub.nombre_dimension])
     );
 
+    console.log("📊 Mapeo de subdimensiones a dimensiones:", 
+      Array.from(subdimMap.entries()).slice(0, 10).map(([sub, dim]) => `${sub} → ${dim}`)
+    );
+
     // Obtener datos de resultados para cada indicador
     const indicadoresConDatos = await Promise.all(
       indicadores.map(async (ind) => {
@@ -158,9 +162,15 @@ export async function getIndicadoresConDatos(
         const tieneDatos = ultimoValor !== undefined;
         const activo = ind.activo !== undefined ? ind.activo : tieneDatos;
 
+        const dimension = subdimMap.get(ind.nombre_subdimension) || "";
+        
+        if (!dimension && ind.nombre_subdimension) {
+          console.warn(`⚠️ No se encontró dimensión para subdimensión: "${ind.nombre_subdimension}" (Indicador: ${ind.nombre})`);
+        }
+
         return {
           ...ind,
-          dimension: subdimMap.get(ind.nombre_subdimension) || "",
+          dimension,
           subdimension: ind.nombre_subdimension,
           ultimoValor,
           ultimoPeriodo: resultados?.[0]?.periodo || undefined,
@@ -169,6 +179,15 @@ export async function getIndicadoresConDatos(
         };
       })
     );
+
+    // Agrupar por dimensión para verificar
+    const indicadoresPorDimension = new Map<string, number>();
+    indicadoresConDatos.forEach(ind => {
+      if (ind.dimension) {
+        indicadoresPorDimension.set(ind.dimension, (indicadoresPorDimension.get(ind.dimension) || 0) + 1);
+      }
+    });
+    console.log("📈 Indicadores por dimensión:", Array.from(indicadoresPorDimension.entries()));
 
     // Ordenar: primero los activos (con datos), luego los inactivos
     indicadoresConDatos.sort((a, b) => {

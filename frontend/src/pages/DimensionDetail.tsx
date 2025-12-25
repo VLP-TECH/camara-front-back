@@ -61,31 +61,31 @@ const COLORS = ['#0c6c8b', '#3B82F6', '#F97316', '#10B981', '#8B5CF6', '#EF4444'
 const dimensionesInfo: Record<string, { icon: any; descripcion: string }> = {
   "Transformación Digital Empresarial": {
     icon: Building2,
-    descripcion: "Evaluación del grado de adopción de tecnologías digitales en el tejido empresarial valenciano, midiendo la integración de herramientas como ERP, CRM, Big Data, Cloud Computing y comercio electrónico."
+    descripcion: "Cuantifica el grado de adopción, integración y aprovechamiento de las tecnologías digitales por parte de las empresas. Incluye digitalización básica, e-commerce, tecnologías avanzadas (big data, IA, cloud, RPA, ciberseguridad) y cultura organizativa digital."
   },
   "Capital Humano": {
     icon: Users,
-    descripcion: "Disponibilidad y cualificación del talento digital en la región."
+    descripcion: "Evalúa las competencias digitales, la capacidad de formación continua y la disponibilidad de talento tecnológico. Mide competencias digitales de la población, formación continua y reciclaje profesional, y talento profesional TIC."
   },
   "Infraestructura Digital": {
     icon: Wifi,
-    descripcion: "Calidad y penetración de redes de conectividad."
+    descripcion: "Analiza el grado de desarrollo, cobertura y accesibilidad de las infraestructuras que habilitan la economía digital. Evalúa el acceso a infraestructuras incluyendo cobertura de banda ancha, conectividad 5G, adopción de servicios de alta capacidad y despliegue de nodos de datos Edge."
   },
   "Ecosistema y Colaboración": {
     icon: Network,
-    descripcion: "Cooperación entre agentes del ecosistema digital."
+    descripcion: "Mide la madurez del ecosistema digital regional y la intensidad de las interacciones entre los agentes públicos, privados y tecnológicos. Evalúa conectividad, colaboración y transferencia, así como el entorno de provisión tecnológica."
   },
-  "Emprendimiento e Innovación": {
+  "Apoyo al emprendimiento e innovación": {
     icon: Lightbulb,
-    descripcion: "Ecosistema de apoyo a startups y proyectos innovadores."
+    descripcion: "Mide la capacidad del entorno regional para fomentar el emprendimiento digital y la innovación tecnológica. Incluye acceso a financiación digital, dinamismo emprendedor, infraestructura de apoyo y políticas públicas de fomento."
   },
   "Servicios Públicos Digitales": {
     icon: Shield,
-    descripcion: "Digitalización y accesibilidad de servicios públicos."
+    descripcion: "Evalúa el nivel de digitalización y calidad de los servicios públicos ofrecidos por la administración regional. Analiza la disponibilidad de servicios públicos digitales y la interacción digital con la administración."
   },
   "Sostenibilidad Digital": {
     icon: Leaf,
-    descripcion: "Impacto ambiental y eficiencia energética de la transformación digital."
+    descripcion: "Integra la perspectiva medioambiental en la economía digital, analizando el impacto y las oportunidades de la digitalización verde. Mide economía circular y estrategias verdes, así como eficiencia y huella ambiental."
   },
 };
 

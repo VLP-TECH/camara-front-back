@@ -56,7 +56,7 @@ const Metodologia = () => {
   const dimensiones = [
     "Transformación Digital Empresarial",
     "Infraestructura Digital",
-    "Emprendimiento e Innovación",
+    "Apoyo al emprendimiento e innovación",
     "Sostenibilidad Digital",
     "Capital Humano",
     "Ecosistema y Colaboración",

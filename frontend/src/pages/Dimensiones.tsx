@@ -34,7 +34,7 @@ import {
   ChevronUp,
   LogOut
 } from "lucide-react";
-import { getDimensiones, getIndicadoresConDatos, type IndicadorConDatos } from "@/lib/kpis-data";
+import { getDimensiones, getIndicadoresConDatos, getDimensionScore, type IndicadorConDatos } from "@/lib/kpis-data";
 
 interface DimensionData {
   nombre: string;
@@ -58,7 +58,7 @@ const Dimensiones = () => {
     navigate('/');
   };
 
-  // Obtener dimensiones
+  // Obtener dimensiones desde Supabase
   const { data: dimensiones } = useQuery({
     queryKey: ["dimensiones"],
     queryFn: getDimensiones,
@@ -70,69 +70,114 @@ const Dimensiones = () => {
     queryFn: () => getIndicadoresConDatos(),
   });
 
-  // Mapeo de dimensiones con sus datos
-  const dimensionesData: DimensionData[] = [
-    {
-      nombre: "Transformación Digital Empresarial",
-      score: 68,
-      descripcion: "Grado de adopción de tecnologías digitales en el tejido empresarial valenciano.",
+  // Mapeo de iconos y descripciones por nombre de dimensión
+  const dimensionesInfo: Record<string, { icon: any; descripcion: string }> = {
+    "Transformación Digital Empresarial": {
       icon: Building2,
-      indicadores: []
+      descripcion: "Cuantifica el grado de adopción, integración y aprovechamiento de las tecnologías digitales por parte de las empresas."
     },
-    {
-      nombre: "Capital Humano",
-      score: 72,
-      descripcion: "Disponibilidad y cualificación del talento digital en la región.",
+    "Capital Humano": {
       icon: Users,
-      indicadores: []
+      descripcion: "Evalúa las competencias digitales, la capacidad de formación continua y la disponibilidad de talento tecnológico."
     },
-    {
-      nombre: "Infraestructura Digital",
-      score: 75,
-      descripcion: "Calidad y penetración de redes de conectividad.",
+    "Infraestructura Digital": {
       icon: Wifi,
-      indicadores: []
+      descripcion: "Analiza el grado de desarrollo, cobertura y accesibilidad de las infraestructuras que habilitan la economía digital."
     },
-    {
-      nombre: "Ecosistema y Colaboración",
-      score: 64,
-      descripcion: "Cooperación entre agentes del ecosistema digital.",
+    "Ecosistema y Colaboración": {
       icon: Network,
-      indicadores: []
+      descripcion: "Mide la madurez del ecosistema digital regional y la intensidad de las interacciones entre los agentes públicos, privados y tecnológicos."
     },
-    {
-      nombre: "Emprendimiento e Innovación",
-      score: 58,
-      descripcion: "Ecosistema de apoyo a startups y proyectos innovadores.",
+    "Apoyo al emprendimiento e innovación": {
       icon: Lightbulb,
-      indicadores: []
+      descripcion: "Mide la capacidad del entorno regional para fomentar el emprendimiento digital y la innovación tecnológica."
     },
-    {
-      nombre: "Servicios Públicos Digitales",
-      score: 70,
-      descripcion: "Digitalización y accesibilidad de servicios públicos.",
+    "Emprendimiento e Innovación": {
+      icon: Lightbulb,
+      descripcion: "Mide la capacidad del entorno regional para fomentar el emprendimiento digital y la innovación tecnológica."
+    },
+    "Servicios Públicos Digitales": {
       icon: Shield,
-      indicadores: []
+      descripcion: "Evalúa el nivel de digitalización y calidad de los servicios públicos ofrecidos por la administración regional."
     },
-    {
-      nombre: "Sostenibilidad Digital",
-      score: 62,
-      descripcion: "Impacto ambiental y eficiencia energética de la transformación digital.",
+    "Sostenibilidad Digital": {
       icon: Leaf,
-      indicadores: []
+      descripcion: "Integra la perspectiva medioambiental en la economía digital, analizando el impacto y las oportunidades de la digitalización verde."
     },
-  ];
+  };
 
-  // Agrupar indicadores por dimensión
-  const dimensionesConIndicadores = dimensionesData.map(dim => {
-    const indicadoresDim = indicadores?.filter(ind => 
-      ind.dimension === dim.nombre
-    ) || [];
+  // Obtener scores de dimensiones
+  const { data: dimensionScores } = useQuery({
+    queryKey: ["dimension-scores-all"],
+    queryFn: async () => {
+      if (!dimensiones) return {};
+      const scores: Record<string, number> = {};
+      await Promise.all(
+        dimensiones.map(async (dim) => {
+          try {
+            const score = await getDimensionScore(dim.nombre, "Comunitat Valenciana", 2024);
+            scores[dim.nombre] = score;
+          } catch (error) {
+            console.error(`Error obteniendo score para ${dim.nombre}:`, error);
+            scores[dim.nombre] = 0;
+          }
+        })
+      );
+      return scores;
+    },
+    enabled: !!dimensiones && dimensiones.length > 0,
+  });
+
+  // Construir dimensiones con datos desde Supabase
+  const dimensionesConIndicadores = dimensiones?.map(dim => {
+    const info = dimensionesInfo[dim.nombre] || dimensionesInfo[Object.keys(dimensionesInfo).find(k => k.toLowerCase() === dim.nombre.toLowerCase()) || ""] || {
+      icon: Layers,
+      descripcion: "Información detallada de la dimensión."
+    };
+    
+    // Buscar indicadores que pertenezcan a esta dimensión
+    // Normalizar nombres para comparación (sin acentos, minúsculas)
+    const normalize = (str: string) => str.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+    
+    const dimNombreNormalized = normalize(dim.nombre);
+    
+    const indicadoresDim = indicadores?.filter(ind => {
+      if (!ind.dimension) return false;
+      const indDimNormalized = normalize(ind.dimension);
+      
+      // Comparación exacta normalizada
+      if (indDimNormalized === dimNombreNormalized) return true;
+      
+      // Comparación por palabras clave comunes
+      const dimKeywords = dimNombreNormalized.split(/\s+/);
+      const indKeywords = indDimNormalized.split(/\s+/);
+      const commonKeywords = dimKeywords.filter(k => indKeywords.includes(k));
+      
+      // Si comparten al menos 2 palabras clave importantes, probablemente es la misma dimensión
+      if (commonKeywords.length >= 2) return true;
+      
+      return false;
+    }) || [];
+
+    if (indicadoresDim.length === 0 && indicadores && indicadores.length > 0) {
+      console.warn(`⚠️ Dimensión "${dim.nombre}" no tiene indicadores asignados. Indicadores disponibles:`, 
+        indicadores.map(i => ({ nombre: i.nombre, dimension: i.dimension })).slice(0, 5)
+      );
+    } else {
+      console.log(`✅ Dimensión "${dim.nombre}": ${indicadoresDim.length} indicadores encontrados`);
+    }
+
     return {
-      ...dim,
+      nombre: dim.nombre,
+      score: dimensionScores?.[dim.nombre] || 0,
+      descripcion: info.descripcion,
+      icon: info.icon,
       indicadores: indicadoresDim
     };
-  });
+  }) || [];
 
   const toggleDimension = (dimensionNombre: string) => {
     const newExpanded = new Set(expandedDimensions);
